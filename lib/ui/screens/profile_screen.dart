@@ -129,7 +129,7 @@ class ProfileScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildStatColumn('Playlists', '${controller.userPlaylists.length}'),
-                _buildStatColumn('Downloads', '${controller.downloads.downloads.length}'),
+                _buildStatColumn('Downloads', '${controller.downloads.downloadedSongs.length}'),
                 _buildStatColumn('Mixes', '${controller.recommendedMixes.length}'),
               ],
             ),

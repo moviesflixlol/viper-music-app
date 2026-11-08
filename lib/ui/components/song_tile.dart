@@ -10,7 +10,8 @@ class SongTile extends StatelessWidget {
   final bool isDownloading;
   final double downloadProgress;
   final VoidCallback onTap;
-  final VoidCallback onDownload;
+  final VoidCallback? onDownload;
+  final Widget? trailing;
 
   const SongTile({
     super.key,
@@ -21,7 +22,8 @@ class SongTile extends StatelessWidget {
     this.isDownloading = false,
     this.downloadProgress = 0.0,
     required this.onTap,
-    required this.onDownload,
+    this.onDownload,
+    this.trailing,
   });
 
   @override
@@ -118,29 +120,32 @@ class SongTile extends StatelessWidget {
                     fontSize: 12,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
               ],
 
-              // Download Status Button
-              IconButton(
-                icon: isDownloading
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          value: downloadProgress > 0 ? downloadProgress : null,
-                          strokeWidth: 2.2,
-                          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryRed),
+              // Custom Trailing Widget or Download Status Button
+              if (trailing != null)
+                trailing!
+              else if (onDownload != null)
+                IconButton(
+                  icon: isDownloading
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            value: downloadProgress > 0 ? downloadProgress : null,
+                            strokeWidth: 2.2,
+                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryRed),
+                          ),
+                        )
+                      : Icon(
+                          isDownloaded ? Icons.check_circle_rounded : Icons.arrow_downward_rounded,
+                          color: isDownloaded ? AppColors.primaryRed : AppColors.textMuted,
+                          size: 22,
                         ),
-                      )
-                    : Icon(
-                        isDownloaded ? Icons.check_circle_rounded : Icons.arrow_downward_rounded,
-                        color: isDownloaded ? AppColors.primaryRed : AppColors.textMuted,
-                        size: 22,
-                      ),
-                onPressed: onDownload,
-                tooltip: isDownloaded ? 'Downloaded' : 'Download for offline playback',
-              ),
+                  onPressed: onDownload,
+                  tooltip: isDownloaded ? 'Downloaded' : 'Download for offline playback',
+                ),
             ],
           ),
         ),
