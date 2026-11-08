@@ -34,6 +34,7 @@ class MusicController extends ChangeNotifier {
   List<Song> _feedRecommendations = [];
   List<Song> _trendingTracks = [];
   List<Playlist> _userPlaylists = [];
+  List<ArtistInfo> _popularArtists = [];
 
   bool _isFeedLoading = false;
   bool _isLoadingMoreFeed = false;
@@ -67,8 +68,8 @@ class MusicController extends ChangeNotifier {
     'acoustic chill vibes',
   ];
 
-  // Real Popular Artists with circular avatars (from Screenshot 4 & 5)
-  static const List<ArtistInfo> popularArtists = [
+  // Diverse pool of popular artists for dynamic rotation
+  static const List<ArtistInfo> _allCuratedArtists = [
     ArtistInfo(
       name: 'Arijit Singh',
       imageUrl: 'https://i.scdn.co/image/ab6761610000e5eb5ba2d75eb08a2d672f9b69b7',
@@ -109,7 +110,50 @@ class MusicController extends ChangeNotifier {
       imageUrl: 'https://i.scdn.co/image/ab6761610000e5eb8654c6b845c4885cc0a2569c',
       genre: 'Rock / Alternative',
     ),
+    ArtistInfo(
+      name: 'Shreya Ghoshal',
+      imageUrl: 'https://i.scdn.co/image/ab6761610000e5ebba9ca876cb862a9b3d09a06e',
+      genre: 'Bollywood Melodies',
+    ),
+    ArtistInfo(
+      name: 'Anirudh Ravichander',
+      imageUrl: 'https://i.scdn.co/image/ab6761610000e5eb74b341c888d3d9229adad066',
+      genre: 'South Indian Viral',
+    ),
+    ArtistInfo(
+      name: 'Badshah',
+      imageUrl: 'https://i.scdn.co/image/ab6761610000e5ebb6b95d7f1d24c3a2c7cf9915',
+      genre: 'Party Hits',
+    ),
+    ArtistInfo(
+      name: 'Pritam',
+      imageUrl: 'https://i.scdn.co/image/ab6761610000e5ebcb3005a7698504a79b0072b2',
+      genre: 'Bollywood Hits',
+    ),
+    ArtistInfo(
+      name: 'Taylor Swift',
+      imageUrl: 'https://i.scdn.co/image/ab6761610000e5eb5a00969a4698c3132a15fbb0',
+      genre: 'Pop / Acoustic',
+    ),
+    ArtistInfo(
+      name: 'Travis Scott',
+      imageUrl: 'https://i.scdn.co/image/ab6761610000e5ebe707b87e3f65e03909e3b977',
+      genre: 'Trap / Hip-Hop',
+    ),
+    ArtistInfo(
+      name: 'AP Dhillon',
+      imageUrl: 'https://i.scdn.co/image/ab6761610000e5eb6dfdd7d6363c46b6279f0fb5',
+      genre: 'Indie Punjabi',
+    ),
+    ArtistInfo(
+      name: 'Dua Lipa',
+      imageUrl: 'https://i.scdn.co/image/ab6761610000e5ebd42a27db3286b58553da8858',
+      genre: 'Dance Pop',
+    ),
   ];
+
+  List<ArtistInfo> get popularArtists =>
+      _popularArtists.isNotEmpty ? _popularArtists : _allCuratedArtists.take(8).toList();
 
   // Real Curated Playlists (Spotify Style matching Screenshot 2, 3, 5)
   static final List<Playlist> curatedPlaylists = [
@@ -292,6 +336,27 @@ class MusicController extends ChangeNotifier {
         _featuredSong = feed.featured;
         _feedRecommendations = feed.recommended;
         _trendingTracks = feed.trending;
+
+        // Dynamic artists update: blend server-provided feed artists with rotating pool
+        final dynamicList = feed.artists.map((a) => ArtistInfo(
+          name: a.name,
+          imageUrl: a.imageUrl,
+          genre: a.genre,
+        )).where((a) => a.imageUrl.isNotEmpty).toList();
+
+        final pool = List<ArtistInfo>.from(_allCuratedArtists)..shuffle();
+        final blendedArtists = <ArtistInfo>[];
+        final seen = <String>{};
+
+        for (final a in [...dynamicList, ...pool]) {
+          final norm = a.name.toLowerCase().trim();
+          if (!seen.contains(norm) && norm != 'various artists' && norm != 'song' && norm != 'video') {
+            seen.add(norm);
+            blendedArtists.add(a);
+            if (blendedArtists.length >= 8) break;
+          }
+        }
+        _popularArtists = blendedArtists;
       } else {
         final query = _selectedCategory == 'Podcasts'
             ? 'trending podcasts hindi'
@@ -310,6 +375,9 @@ class MusicController extends ChangeNotifier {
 
         if (trending.isNotEmpty) _trendingTracks = trending.take(15).toList();
         if (topPicks.isNotEmpty) _feedRecommendations = topPicks.take(20).toList();
+
+        final pool = List<ArtistInfo>.from(_allCuratedArtists)..shuffle();
+        _popularArtists = pool.take(8).toList();
       }
     } catch (_) {}
 

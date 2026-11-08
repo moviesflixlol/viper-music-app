@@ -31,7 +31,7 @@ class FeedScreen extends StatelessWidget {
     final startListening = controller.trendingTracks.take(4).toList();
     final recommended = controller.feedRecommendations;
     final charts = MusicController.curatedPlaylists;
-    final artists = MusicController.popularArtists;
+    final artists = controller.popularArtists;
 
     return RefreshIndicator(
       color: AppColors.primaryRed,
@@ -49,27 +49,31 @@ class FeedScreen extends StatelessWidget {
             titleSpacing: 16,
             title: Row(
               children: [
-                // Circular 'M' Avatar
+                // Real M Header PNG Logo (Matching original design)
                 GestureDetector(
                   onTap: () => controller.setTab(3), // Open profile
                   child: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: const BoxDecoration(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [AppColors.primaryRed, Color(0xFFB80710)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: Colors.black,
+                      border: Border.all(color: AppColors.primaryRed.withOpacity(0.6), width: 1.2),
                     ),
-                    child: const Center(
-                      child: Text(
-                        'M',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 18,
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.asset(
+                      'assets/images/header_logo.png',
+                      width: 36,
+                      height: 36,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Center(
+                        child: Text(
+                          'M',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
                         ),
                       ),
                     ),

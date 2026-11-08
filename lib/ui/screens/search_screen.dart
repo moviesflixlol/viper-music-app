@@ -110,16 +110,24 @@ class _SearchScreenState extends State<SearchScreen> {
                   GestureDetector(
                     onTap: () => controller.setTab(3),
                     child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: const BoxDecoration(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: AppColors.primaryRed,
+                        color: Colors.black,
+                        border: Border.all(color: AppColors.primaryRed.withOpacity(0.6), width: 1.2),
                       ),
-                      child: const Center(
-                        child: Text(
-                          'M',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.asset(
+                        'assets/images/header_logo.png',
+                        width: 36,
+                        height: 36,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Text(
+                            'M',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                          ),
                         ),
                       ),
                     ),

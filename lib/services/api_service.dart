@@ -1,21 +1,46 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:http/http.dart' as http;
 import '../constants/api_constants.dart';
 import '../models/song.dart';
 import '../models/playlist.dart';
 import '../models/user.dart';
 
+class ArtistItem {
+  final String name;
+  final String imageUrl;
+  final String genre;
+
+  const ArtistItem({
+    required this.name,
+    required this.imageUrl,
+    required this.genre,
+  });
+
+  factory ArtistItem.fromJson(Map<String, dynamic> json) {
+    return ArtistItem(
+      name: json['name'] as String? ?? 'Artist',
+      imageUrl: json['imageUrl'] as String? ?? '',
+      genre: json['genre'] as String? ?? 'Pop',
+    );
+  }
+}
+
 class FeedResult {
   final Song featured;
   final List<Song> recommended;
   final List<Playlist> mixes;
   final List<Song> trending;
+  final List<ArtistItem> artists;
+  final String country;
 
   FeedResult({
     required this.featured,
     required this.recommended,
     required this.mixes,
     required this.trending,
+    this.artists = const [],
+    this.country = 'IN',
   });
 }
 
@@ -47,11 +72,15 @@ class ApiService {
   }
 
   /// Fetch intelligent recommendation feed from NextViper
-  Future<FeedResult?> getFeed({String? token, String? category}) async {
+  Future<FeedResult?> getFeed({String? token, String? category, String? country}) async {
     try {
-      final queryParam = category != null && category.isNotEmpty && category != 'All'
-          ? '?category=${Uri.encodeComponent(category)}'
-          : '';
+      final detectedCountry = country ?? ui.PlatformDispatcher.instance.locale.countryCode ?? 'IN';
+      final queryParam = StringBuffer('?country=${Uri.encodeComponent(detectedCountry)}');
+      if (category != null && category.isNotEmpty && category != 'All') {
+        queryParam.write('&category=${Uri.encodeComponent(category)}');
+      }
+      queryParam.write('&r=${DateTime.now().millisecondsSinceEpoch}');
+
       final uri = Uri.parse('$baseUrl${ApiConstants.feedEndpoint}$queryParam');
       final response = await http
           .get(uri, headers: _buildHeaders(token: token))
@@ -85,11 +114,18 @@ class ApiService {
             .map((e) => Song.fromJson(e))
             .toList();
 
+        final artistList = (data['artists'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map((e) => ArtistItem.fromJson(e))
+            .toList();
+
         return FeedResult(
           featured: featuredSong,
           recommended: recList,
           mixes: mixesList,
           trending: trendList,
+          artists: artistList,
+          country: data['country'] as String? ?? detectedCountry,
         );
       }
       return null;
