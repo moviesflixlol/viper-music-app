@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 import '../models/song.dart';
 import 'api_service.dart';
 import 'file_helper.dart';
+import 'web_audio_bridge.dart';
 
 enum PlaybackState { idle, loading, playing, paused, completed, error }
 enum PlayerRepeatMode { off, all, one }
@@ -11,6 +13,7 @@ enum PlayerRepeatMode { off, all, one }
 class AudioPlayerService extends ChangeNotifier {
   final ApiService apiService;
   final AudioPlayer _player = AudioPlayer();
+  Timer? _webPositionTimer;
 
   Song? _currentSong;
   List<Song> _queue = [];
@@ -44,6 +47,7 @@ class AudioPlayerService extends ChangeNotifier {
     }
 
     _player.playerStateStream.listen((playerState) {
+      if (kIsWeb) return; // Managed via WebAudioBridge on web
       if (playerState.processingState == ProcessingState.loading ||
           playerState.processingState == ProcessingState.buffering) {
         _state = PlaybackState.loading;
@@ -59,11 +63,13 @@ class AudioPlayerService extends ChangeNotifier {
     });
 
     _player.positionStream.listen((pos) {
+      if (kIsWeb) return;
       _position = pos;
       notifyListeners();
     });
 
     _player.durationStream.listen((dur) {
+      if (kIsWeb) return;
       _duration = dur ?? Duration.zero;
       notifyListeners();
     });
@@ -89,10 +95,20 @@ class AudioPlayerService extends ChangeNotifier {
   Future<void> _loadAndPlay(Song song) async {
     _currentSong = song;
     _state = PlaybackState.loading;
+    _position = Duration.zero;
     notifyListeners();
 
     try {
-      // 1. If song is downloaded and on native, play directly from local file
+      // 1. Web Player Engine (uses YouTube Iframe audio bridge with 0 CORS & 0 bot blocks)
+      if (kIsWeb && WebAudioBridge.isSupported) {
+        WebAudioBridge.playSong(song.id);
+        _state = PlaybackState.playing;
+        _startWebPositionTimer();
+        notifyListeners();
+        return;
+      }
+
+      // 2. Native Offline File Playback
       if (!kIsWeb && song.isDownloaded && song.localFilePath != null && checkFileExists(song.localFilePath!)) {
         final source = getAudioSourceForFile(song.localFilePath!);
         if (source != null) {
@@ -102,36 +118,100 @@ class AudioPlayerService extends ChangeNotifier {
         }
       }
 
-      // 2. Otherwise resolve stream URL from NextViper backend
+      // 3. Native Stream Playback
       String? streamUrl = song.streamUrl;
       if (streamUrl == null || streamUrl.isEmpty) {
         streamUrl = await apiService.resolveStreamUrl(song.id);
       }
 
-      if (streamUrl == null) {
+      if (streamUrl != null && streamUrl.isNotEmpty) {
+        await _player.setAudioSource(
+          AudioSource.uri(
+            Uri.parse(streamUrl),
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          ),
+        );
+        await _player.play();
+      } else {
+        // Fallback to WebAudioBridge if available
+        if (WebAudioBridge.isSupported) {
+          WebAudioBridge.playSong(song.id);
+          _state = PlaybackState.playing;
+          _startWebPositionTimer();
+          notifyListeners();
+          return;
+        }
         throw Exception("Unable to extract playable audio stream");
       }
-
-      await _player.setAudioSource(
-        AudioSource.uri(
-          Uri.parse(streamUrl),
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          },
-        ),
-      );
-      await _player.play();
     } catch (e) {
       _state = PlaybackState.error;
       notifyListeners();
     }
   }
 
-  Future<void> resume() async => await _player.play();
-  Future<void> pause() async => await _player.pause();
+  void _startWebPositionTimer() {
+    _webPositionTimer?.cancel();
+    _webPositionTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      if (_state != PlaybackState.playing && _state != PlaybackState.paused) return;
+
+      final currentSec = WebAudioBridge.getCurrentTime();
+      final totalSec = WebAudioBridge.getDuration();
+      final ytState = WebAudioBridge.getPlayerState();
+
+      // State 0 = ended
+      if (ytState == 0) {
+        _onTrackCompleted();
+        return;
+      }
+
+      // State 1 = playing, 2 = paused
+      if (ytState == 1 && _state != PlaybackState.playing) {
+        _state = PlaybackState.playing;
+      } else if (ytState == 2 && _state != PlaybackState.paused) {
+        _state = PlaybackState.paused;
+      }
+
+      _position = Duration(milliseconds: (currentSec * 1000).toInt());
+      if (totalSec > 0) {
+        _duration = Duration(milliseconds: (totalSec * 1000).toInt());
+      }
+      notifyListeners();
+    });
+  }
+
+  Future<void> resume() async {
+    if (kIsWeb && WebAudioBridge.isSupported) {
+      WebAudioBridge.resume();
+      _state = PlaybackState.playing;
+      notifyListeners();
+      return;
+    }
+    await _player.play();
+  }
+
+  Future<void> pause() async {
+    if (kIsWeb && WebAudioBridge.isSupported) {
+      WebAudioBridge.pause();
+      _state = PlaybackState.paused;
+      notifyListeners();
+      return;
+    }
+    await _player.pause();
+  }
+
   Future<void> togglePlayPause() async => isPlaying ? await pause() : await resume();
 
-  Future<void> seek(Duration position) async => await _player.seek(position);
+  Future<void> seek(Duration position) async {
+    if (kIsWeb && WebAudioBridge.isSupported) {
+      WebAudioBridge.seek(position.inMilliseconds / 1000.0);
+      _position = position;
+      notifyListeners();
+      return;
+    }
+    await _player.seek(position);
+  }
 
   Future<void> skipNext() async {
     if (_queue.isEmpty) return;
@@ -194,6 +274,7 @@ class AudioPlayerService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _webPositionTimer?.cancel();
     _player.dispose();
     super.dispose();
   }

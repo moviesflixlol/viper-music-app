@@ -59,10 +59,92 @@
     <div class="spinner"></div>
   </div>
 
+  <!-- Background Audio Player Engine -->
+  <div id="yt-player-container" style="position:fixed; bottom:-500px; right:-500px; width:200px; height:200px; opacity:0; pointer-events:none; z-index:-999;">
+    <div id="viper-yt-player"></div>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    var viperYtPlayer = null;
+    var viperPlayerReady = false;
+    var viperPendingVideoId = null;
+
+    function onYouTubeIframeAPIReady() {
+      viperYtPlayer = new YT.Player('viper-yt-player', {
+        height: '200',
+        width: '200',
+        playerVars: {
+          'playsinline': 1,
+          'controls': 0,
+          'disablekb': 1,
+          'fs': 0,
+          'rel': 0,
+          'autoplay': 1
+        },
+        events: {
+          'onReady': function(e) {
+            viperPlayerReady = true;
+            if (viperPendingVideoId) {
+              viperYtPlayer.loadVideoById(viperPendingVideoId);
+              viperYtPlayer.playVideo();
+            }
+          }
+        }
+      });
+    }
+
+    window.viperPlaySong = function(videoId) {
+      viperPendingVideoId = videoId;
+      if (viperYtPlayer && viperPlayerReady && viperYtPlayer.loadVideoById) {
+        viperYtPlayer.loadVideoById(videoId);
+        viperYtPlayer.playVideo();
+      }
+    };
+
+    window.viperPause = function() {
+      if (viperYtPlayer && viperYtPlayer.pauseVideo) {
+        viperYtPlayer.pauseVideo();
+      }
+    };
+
+    window.viperResume = function() {
+      if (viperYtPlayer && viperYtPlayer.playVideo) {
+        viperYtPlayer.playVideo();
+      }
+    };
+
+    window.viperSeek = function(seconds) {
+      if (viperYtPlayer && viperYtPlayer.seekTo) {
+        viperYtPlayer.seekTo(seconds, true);
+      }
+    };
+
+    window.viperGetTime = function() {
+      if (viperYtPlayer && viperYtPlayer.getCurrentTime) {
+        return viperYtPlayer.getCurrentTime() || 0;
+      }
+      return 0;
+    };
+
+    window.viperGetDuration = function() {
+      if (viperYtPlayer && viperYtPlayer.getDuration) {
+        return viperYtPlayer.getDuration() || 0;
+      }
+      return 0;
+    };
+
+    window.viperGetState = function() {
+      if (viperYtPlayer && viperYtPlayer.getPlayerState) {
+        return viperYtPlayer.getPlayerState();
+      }
+      return -1;
+    };
+  </script>
+
   <script src="flutter.js" defer></script>
   <script>
     window.addEventListener('load', function(ev) {
-      // Download main.dart.js
       _flutter.loader.loadEntrypoint({
         serviceWorker: {
           serviceWorkerVersion: {{flutter_service_worker_version}},
