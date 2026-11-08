@@ -6,7 +6,7 @@ import 'api_service.dart';
 import 'file_helper.dart';
 
 enum PlaybackState { idle, loading, playing, paused, completed, error }
-enum RepeatMode { off, all, one }
+enum PlayerRepeatMode { off, all, one }
 
 class AudioPlayerService extends ChangeNotifier {
   final ApiService apiService;
@@ -19,7 +19,7 @@ class AudioPlayerService extends ChangeNotifier {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   bool _isShuffle = false;
-  RepeatMode _repeatMode = RepeatMode.off;
+  PlayerRepeatMode _repeatMode = PlayerRepeatMode.off;
 
   AudioPlayerService({required this.apiService}) {
     _initAudio();
@@ -32,7 +32,7 @@ class AudioPlayerService extends ChangeNotifier {
   Duration get position => _position;
   Duration get duration => _duration;
   bool get isShuffle => _isShuffle;
-  RepeatMode get repeatMode => _repeatMode;
+  PlayerRepeatMode get repeatMode => _repeatMode;
   bool get isPlaying => _state == PlaybackState.playing;
 
   Future<void> _initAudio() async {
@@ -135,7 +135,7 @@ class AudioPlayerService extends ChangeNotifier {
 
   Future<void> skipNext() async {
     if (_queue.isEmpty) return;
-    if (_repeatMode == RepeatMode.one) {
+    if (_repeatMode == PlayerRepeatMode.one) {
       await seek(Duration.zero);
       await resume();
       return;
@@ -144,7 +144,7 @@ class AudioPlayerService extends ChangeNotifier {
     if (_currentIndex + 1 < _queue.length) {
       _currentIndex++;
       await _loadAndPlay(_queue[_currentIndex]);
-    } else if (_repeatMode == RepeatMode.all) {
+    } else if (_repeatMode == PlayerRepeatMode.all) {
       _currentIndex = 0;
       await _loadAndPlay(_queue[0]);
     }
@@ -171,21 +171,21 @@ class AudioPlayerService extends ChangeNotifier {
 
   void toggleRepeat() {
     switch (_repeatMode) {
-      case RepeatMode.off:
-        _repeatMode = RepeatMode.all;
+      case PlayerRepeatMode.off:
+        _repeatMode = PlayerRepeatMode.all;
         break;
-      case RepeatMode.all:
-        _repeatMode = RepeatMode.one;
+      case PlayerRepeatMode.all:
+        _repeatMode = PlayerRepeatMode.one;
         break;
-      case RepeatMode.one:
-        _repeatMode = RepeatMode.off;
+      case PlayerRepeatMode.one:
+        _repeatMode = PlayerRepeatMode.off;
         break;
     }
     notifyListeners();
   }
 
   void _onTrackCompleted() {
-    if (_repeatMode == RepeatMode.one) {
+    if (_repeatMode == PlayerRepeatMode.one) {
       seek(Duration.zero).then((_) => resume());
     } else {
       skipNext();
