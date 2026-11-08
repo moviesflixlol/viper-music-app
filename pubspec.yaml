@@ -1,0 +1,37 @@
+name: viper_music
+description: "A minimal, Netflix-inspired dark music player with background playback and offline downloads."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Audio Playback & Background Service
+  just_audio: ^0.9.36
+  audio_service: ^0.18.12
+  audio_session: ^0.1.18
+
+  # Networking & HTTP API
+  http: ^1.2.0
+  dio: ^5.4.1
+
+  # Caching & Storage
+  cached_network_image: ^3.3.1
+  path_provider: ^2.1.2
+  shared_preferences: ^2.2.2
+
+  # UI & Design
+  google_fonts: ^6.1.0
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
