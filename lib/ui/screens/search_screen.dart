@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
 import '../../state/music_controller.dart';
 import '../components/song_tile.dart';
+import '../components/add_to_playlist_sheet.dart';
 
 class SearchScreen extends StatefulWidget {
   final MusicController controller;
@@ -130,7 +131,6 @@ class _SearchScreenState extends State<SearchScreen> {
                       ? ListView.builder(
                           itemCount: controller.searchResults.length + 1,
                           itemBuilder: (context, index) {
-                            // Bottom "Load More Results" item
                             if (index == controller.searchResults.length) {
                               return Padding(
                                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 80),
@@ -172,11 +172,15 @@ class _SearchScreenState extends State<SearchScreen> {
                               isDownloading: controller.downloads.isDownloading(song.id),
                               downloadProgress: controller.downloads.getDownloadProgress(song.id),
                               onTap: () {
-                                controller.player.playSong(song, queueContext: controller.searchResults);
+                                controller.playSongWithAuth(context, song, queueContext: controller.searchResults);
                               },
                               onDownload: () {
                                 controller.downloads.downloadSong(song);
                               },
+                              trailing: IconButton(
+                                icon: const Icon(Icons.playlist_add, color: Colors.white54, size: 22),
+                                onPressed: () => AddToPlaylistSheet.show(context, controller, song),
+                              ),
                             );
                           },
                         )
@@ -193,27 +197,16 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.headphones_rounded,
-            size: 64,
-            color: AppColors.surfaceHighlight,
-          ),
+          Icon(Icons.music_note_rounded, size: 64, color: Colors.white.withOpacity(0.15)),
           const SizedBox(height: 16),
-          const Text(
-            'Explore Over 100 Million Songs',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+          Text(
+            'Discover Music on NextViper',
+            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Powered by NextViper backend streaming engine',
-            style: TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 13,
-            ),
+          Text(
+            'Search any artist, song, album, or genre',
+            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
           ),
         ],
       ),

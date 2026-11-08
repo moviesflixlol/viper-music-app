@@ -1,19 +1,29 @@
 import 'package:flutter/material.dart';
 import '../models/song.dart';
+import '../models/playlist.dart';
 import '../services/api_service.dart';
 import '../services/audio_player_service.dart';
+import '../services/auth_service.dart';
 import '../services/download_service.dart';
+import '../ui/screens/auth_screen.dart';
 
 class MusicController extends ChangeNotifier {
   final ApiService apiService;
+  final AuthService authService;
   late final AudioPlayerService player;
   late final DownloadService downloads;
 
   int _selectedTabIndex = 0;
+  String _selectedCategory = 'All Titles';
+  Song? _featuredSong;
   List<Song> _feedRecommendations = [];
   List<Song> _trendingTracks = [];
+  List<Playlist> _recommendedMixes = [];
+  List<Playlist> _userPlaylists = [];
+
   bool _isFeedLoading = false;
   bool _isLoadingMoreFeed = false;
+  bool _isPlaylistsLoading = false;
   bool _isBackendConnected = false;
   int _feedPage = 0;
 
@@ -23,6 +33,16 @@ class MusicController extends ChangeNotifier {
   bool _isLoadingMoreSearch = false;
   String _currentQuery = '';
   int _searchPage = 0;
+
+  static const List<String> categories = [
+    'All Titles',
+    'Songs',
+    'Playlists',
+    'Mixes',
+    'Trending',
+    'Chill',
+    'Workout',
+  ];
 
   static const List<String> _feedQueries = [
     'global top hits',
@@ -34,25 +54,43 @@ class MusicController extends ChangeNotifier {
     'rnb slow jams',
   ];
 
-  MusicController({required this.apiService}) {
+  MusicController({
+    required this.apiService,
+    required this.authService,
+  }) {
     player = AudioPlayerService(apiService: apiService);
     downloads = DownloadService(apiService: apiService);
 
     player.addListener(notifyListeners);
     downloads.addListener(notifyListeners);
+    authService.addListener(_onAuthChanged);
 
-    // Seed instant curated tracks so UI is never blank
+    // Initial default state
     _trendingTracks = _defaultTrendingTracks;
     _feedRecommendations = _defaultPicks;
+    _featuredSong = _defaultTrendingTracks[0];
 
     loadInitialFeed();
+    loadUserPlaylists();
+  }
+
+  void _onAuthChanged() {
+    loadUserPlaylists();
+    loadInitialFeed();
+    notifyListeners();
   }
 
   int get selectedTabIndex => _selectedTabIndex;
+  String get selectedCategory => _selectedCategory;
+  Song? get featuredSong => _featuredSong;
   List<Song> get feedRecommendations => _feedRecommendations;
   List<Song> get trendingTracks => _trendingTracks;
+  List<Playlist> get recommendedMixes => _recommendedMixes;
+  List<Playlist> get userPlaylists => _userPlaylists;
+
   bool get isFeedLoading => _isFeedLoading;
   bool get isLoadingMoreFeed => _isLoadingMoreFeed;
+  bool get isPlaylistsLoading => _isPlaylistsLoading;
   bool get isBackendConnected => _isBackendConnected;
 
   List<Song> get searchResults => _searchResults;
@@ -65,28 +103,104 @@ class MusicController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setCategory(String cat) {
+    _selectedCategory = cat;
+    notifyListeners();
+  }
+
+  /// Playback Guard: Requires user authentication before playing music
+  Future<bool> playSongWithAuth(
+    BuildContext context,
+    Song song, {
+    List<Song>? queueContext,
+  }) async {
+    if (!authService.isLoggedIn) {
+      final loggedIn = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (ctx) => AuthScreen(authService: authService),
+          fullscreenDialog: true,
+        ),
+      );
+
+      if (loggedIn != true && !authService.isLoggedIn) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please sign in to stream high-fidelity music.'),
+              backgroundColor: Color(0xFFE50914),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return false;
+      }
+    }
+
+    // User is authenticated, proceed to play
+    await player.playSong(song, queueContext: queueContext);
+
+    // Send recommendation telemetry signal to NextViper engine
+    apiService.sendRecommendationEvent(
+      trackId: song.id,
+      eventType: 'play',
+      artist: song.artist,
+      genre: song.genre,
+      token: authService.token,
+    );
+
+    return true;
+  }
+
+  /// Skip track with telemetry
+  Future<void> skipNextWithTelemetry() async {
+    final curSong = player.currentSong;
+    final pos = player.position.inSeconds;
+    final dur = player.duration.inSeconds;
+
+    if (curSong != null) {
+      apiService.sendRecommendationEvent(
+        trackId: curSong.id,
+        eventType: 'skip',
+        duration: dur > 0 ? dur : 180,
+        playedSeconds: pos,
+        artist: curSong.artist,
+        genre: curSong.genre,
+        token: authService.token,
+      );
+    }
+
+    await player.skipNext();
+  }
+
+  /// Fetch intelligent recommendation feed from NextViper AWS backend
   Future<void> loadInitialFeed() async {
     _isFeedLoading = true;
     _feedPage = 0;
     notifyListeners();
 
     try {
-      // Parallel queries to NextViper AWS backend with fast response
-      final results = await Future.wait([
-        apiService.search('trending music').catchError((_) => <Song>[]),
-        apiService.search('top hits billboard').catchError((_) => <Song>[]),
-        apiService.checkHealth().catchError((_) => false),
-      ]);
+      final feed = await apiService.getFeed(token: authService.token);
+      _isBackendConnected = feed != null;
 
-      final trending = results[0] as List<Song>;
-      final topPicks = results[1] as List<Song>;
-      _isBackendConnected = results[2] as bool;
+      if (feed != null) {
+        _featuredSong = feed.featured;
+        _feedRecommendations = feed.recommended;
+        _recommendedMixes = feed.mixes;
+        _trendingTracks = feed.trending;
+      } else {
+        // Fallback to search-based discovery if feed endpoint is unreachable
+        final results = await Future.wait([
+          apiService.search('trending music').catchError((_) => <Song>[]),
+          apiService.search('top hits billboard').catchError((_) => <Song>[]),
+          apiService.checkHealth().catchError((_) => false),
+        ]);
 
-      if (trending.isNotEmpty) {
-        _trendingTracks = trending.take(12).toList();
-      }
-      if (topPicks.isNotEmpty) {
-        _feedRecommendations = topPicks.take(20).toList();
+        final trending = results[0] as List<Song>;
+        final topPicks = results[1] as List<Song>;
+        _isBackendConnected = results[2] as bool;
+
+        if (trending.isNotEmpty) _trendingTracks = trending.take(12).toList();
+        if (topPicks.isNotEmpty) _feedRecommendations = topPicks.take(20).toList();
       }
     } catch (_) {}
 
@@ -117,6 +231,120 @@ class MusicController extends ChangeNotifier {
     _isLoadingMoreFeed = false;
     notifyListeners();
   }
+
+  // --- Cloud Playlists CRUD ---
+
+  Future<void> loadUserPlaylists() async {
+    _isPlaylistsLoading = true;
+    notifyListeners();
+
+    try {
+      final playlists = await apiService.getPlaylists(token: authService.token);
+      _userPlaylists = playlists;
+    } catch (_) {}
+
+    _isPlaylistsLoading = false;
+    notifyListeners();
+  }
+
+  Future<bool> createPlaylist(String name, {String description = ''}) async {
+    try {
+      final newPl = await apiService.createPlaylist(
+        name: name,
+        description: description,
+        token: authService.token,
+      );
+      if (newPl != null) {
+        _userPlaylists = [newPl, ..._userPlaylists];
+        notifyListeners();
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<bool> addSongToPlaylist(String playlistId, Song song) async {
+    try {
+      final updated = await apiService.addTrackToPlaylist(
+        playlistId: playlistId,
+        track: song,
+        token: authService.token,
+      );
+      if (updated != null) {
+        final idx = _userPlaylists.indexWhere((p) => p.id == playlistId);
+        if (idx != -1) {
+          _userPlaylists[idx] = updated;
+        } else {
+          _userPlaylists.add(updated);
+        }
+        notifyListeners();
+
+        // Send telemetry: track added to playlist
+        apiService.sendRecommendationEvent(
+          trackId: song.id,
+          eventType: 'add_to_playlist',
+          artist: song.artist,
+          genre: song.genre,
+          token: authService.token,
+        );
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<bool> removeSongFromPlaylist(String playlistId, String songId) async {
+    try {
+      final success = await apiService.removeTrackFromPlaylist(
+        playlistId: playlistId,
+        trackId: songId,
+        token: authService.token,
+      );
+      if (success) {
+        final idx = _userPlaylists.indexWhere((p) => p.id == playlistId);
+        if (idx != -1) {
+          final cur = _userPlaylists[idx];
+          final updatedTracks = cur.tracks.where((t) => t.id != songId).toList();
+          _userPlaylists[idx] = cur.copyWith(tracks: updatedTracks);
+          notifyListeners();
+        }
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<bool> deletePlaylist(String playlistId) async {
+    try {
+      final success = await apiService.deletePlaylist(
+        playlistId: playlistId,
+        token: authService.token,
+      );
+      if (success) {
+        _userPlaylists = _userPlaylists.where((p) => p.id != playlistId).toList();
+        notifyListeners();
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<bool> saveRecommendationMix(Playlist mix) async {
+    try {
+      final saved = await apiService.saveMix(
+        mix: mix,
+        token: authService.token,
+      );
+      if (saved != null) {
+        _userPlaylists = [saved, ..._userPlaylists];
+        notifyListeners();
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  // --- Search ---
 
   Future<void> search(String query) async {
     _currentQuery = query;
@@ -163,87 +391,84 @@ class MusicController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateBaseUrl(String newUrl) {
-    apiService.baseUrl = newUrl;
-    loadInitialFeed();
-  }
-
   @override
   void dispose() {
     player.removeListener(notifyListeners);
     downloads.removeListener(notifyListeners);
+    authService.removeListener(_onAuthChanged);
     player.dispose();
     downloads.dispose();
     super.dispose();
   }
 
-  // --- Instant Fallback Tracks (eliminates loading timeouts & blank screens) ---
+  // --- Instant Fallback Tracks ---
   static const List<Song> _defaultTrendingTracks = [
     Song(
-      id: 'rqCP4Invnrs',
-      title: 'Fun (feat. Tove Lo)',
-      artist: 'Coldplay',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400',
-      duration: '4:27',
-    ),
-    Song(
-      id: 'DG8o24dFq7w',
-      title: 'BIRDS OF A FEATHER',
-      artist: 'Billie Eilish',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400',
-      duration: '3:30',
+      id: 'eVli-tstM5E',
+      title: 'Espresso',
+      artist: 'Sabrina Carpenter',
+      thumbnailUrl: 'https://i.ytimg.com/vi/eVli-tstM5E/hqdefault.jpg',
+      duration: '2:55',
+      genre: 'Pop',
     ),
     Song(
       id: '4NRXx6U8ABQ',
       title: 'Blinding Lights',
       artist: 'The Weeknd',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400',
+      thumbnailUrl: 'https://i.ytimg.com/vi/4NRXx6U8ABQ/hqdefault.jpg',
       duration: '3:20',
+      genre: 'Pop',
     ),
     Song(
-      id: 'kJQP7kiw5Fk',
-      title: 'Despacito',
-      artist: 'Luis Fonsi ft. Daddy Yankee',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400',
-      duration: '4:42',
+      id: 'H58vbez_m4E',
+      title: 'Not Like Us',
+      artist: 'Kendrick Lamar',
+      thumbnailUrl: 'https://i.ytimg.com/vi/H58vbez_m4E/hqdefault.jpg',
+      duration: '4:34',
+      genre: 'Hip-Hop',
     ),
     Song(
-      id: 'JGwWNGJdvx8',
-      title: 'Shape of You',
-      artist: 'Ed Sheeran',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=400',
-      duration: '3:53',
+      id: 'V9PVRfjEBTI',
+      title: 'BIRDS OF A FEATHER',
+      artist: 'Billie Eilish',
+      thumbnailUrl: 'https://i.ytimg.com/vi/V9PVRfjEBTI/hqdefault.jpg',
+      duration: '3:13',
+      genre: 'Pop',
     ),
   ];
 
   static const List<Song> _defaultPicks = [
     Song(
-      id: '0VwhorQ51gE',
-      title: 'Starboy',
-      artist: 'The Weeknd ft. Daft Punk',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400',
-      duration: '3:50',
+      id: '2Vv-BfVoq4g',
+      title: 'Perfect',
+      artist: 'Ed Sheeran',
+      thumbnailUrl: 'https://i.ytimg.com/vi/2Vv-BfVoq4g/hqdefault.jpg',
+      duration: '4:23',
+      genre: 'Acoustic',
     ),
     Song(
-      id: '3tmd-ClpJxA',
-      title: 'Look What You Made Me Do',
-      artist: 'Taylor Swift',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1487180144351-b8472da7d491?w=400',
-      duration: '4:15',
+      id: 'bpOSxM0rNPM',
+      title: 'Do I Wanna Know?',
+      artist: 'Arctic Monkeys',
+      thumbnailUrl: 'https://i.ytimg.com/vi/bpOSxM0rNPM/hqdefault.jpg',
+      duration: '4:32',
+      genre: 'Rock',
     ),
     Song(
-      id: 'fJ9rUzIMcZQ',
-      title: 'Bohemian Rhapsody',
-      artist: 'Queen',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=400',
-      duration: '5:55',
+      id: 'MV_3Dpw-BRY',
+      title: 'Nightcall',
+      artist: 'Kavinsky',
+      thumbnailUrl: 'https://i.ytimg.com/vi/MV_3Dpw-BRY/hqdefault.jpg',
+      duration: '4:19',
+      genre: 'Electronic',
     ),
     Song(
-      id: 'hT_nvWreIhg',
-      title: 'Counting Stars',
-      artist: 'OneRepublic',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=400',
-      duration: '4:17',
+      id: 'cr_V3aBffpY',
+      title: 'MONACO',
+      artist: 'Bad Bunny',
+      thumbnailUrl: 'https://i.ytimg.com/vi/cr_V3aBffpY/hqdefault.jpg',
+      duration: '4:27',
+      genre: 'Latin',
     ),
   ];
 }

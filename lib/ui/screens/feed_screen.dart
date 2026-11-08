@@ -4,11 +4,38 @@ import '../../models/song.dart';
 import '../../state/music_controller.dart';
 import '../components/hero_header.dart';
 import '../components/song_tile.dart';
+import '../components/add_to_playlist_sheet.dart';
 
 class FeedScreen extends StatelessWidget {
   final MusicController controller;
 
   const FeedScreen({super.key, required this.controller});
+
+  void _showInfoDialog(BuildContext context, Song song) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text(song.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Artist: ${song.artist}', style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 6),
+            Text('Genre: ${song.genre}', style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 6),
+            Text('Duration: ${song.duration}', style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 6),
+            Text('Match Score: ${(song.popularity * 100).toInt()}%', style: const TextStyle(color: AppColors.primaryRed, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close', style: TextStyle(color: Colors.white70))),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,14 +45,29 @@ class FeedScreen extends StatelessWidget {
       );
     }
 
-    final featured = controller.trendingTracks.isNotEmpty
-        ? controller.trendingTracks.first
-        : const Song(
-            id: 'dQw4w9WgXcQ',
-            title: 'Discover Fresh Hits',
-            artist: 'NextViper Music Stream',
-            thumbnailUrl: '',
-          );
+    final featured = controller.featuredSong ??
+        (controller.trendingTracks.isNotEmpty
+            ? controller.trendingTracks.first
+            : const Song(
+                id: '4NRXx6U8ABQ',
+                title: 'Blinding Lights',
+                artist: 'The Weeknd',
+                thumbnailUrl: 'https://i.ytimg.com/vi/4NRXx6U8ABQ/hqdefault.jpg',
+              ));
+
+    // Filter recommended tracks by category if not 'All Titles'
+    List<Song> displayRecommended = controller.feedRecommendations;
+    if (controller.selectedCategory == 'Songs') {
+      displayRecommended = controller.feedRecommendations;
+    } else if (controller.selectedCategory == 'Trending') {
+      displayRecommended = controller.trendingTracks;
+    } else if (controller.selectedCategory == 'Chill') {
+      displayRecommended = controller.feedRecommendations.where((s) => s.genre == 'Acoustic' || s.genre == 'Chill').toList();
+      if (displayRecommended.isEmpty) displayRecommended = controller.feedRecommendations;
+    } else if (controller.selectedCategory == 'Workout') {
+      displayRecommended = controller.feedRecommendations.where((s) => s.genre == 'Hip-Hop' || s.genre == 'Electronic' || s.genre == 'Rock').toList();
+      if (displayRecommended.isEmpty) displayRecommended = controller.feedRecommendations;
+    }
 
     return RefreshIndicator(
       color: AppColors.primaryRed,
@@ -33,260 +75,398 @@ class FeedScreen extends StatelessWidget {
       onRefresh: controller.loadInitialFeed,
       child: CustomScrollView(
         slivers: [
-          // Netflix App Bar with Custom Logo
+          // 1. Sleek Header matching Screenshot (M Logo + Inline Search + Grid Icon)
           SliverAppBar(
-            backgroundColor: AppColors.background.withOpacity(0.9),
+            backgroundColor: AppColors.background.withOpacity(0.92),
             floating: true,
             pinned: false,
             elevation: 0,
+            titleSpacing: 16,
             title: Row(
               children: [
-                // Custom Header Logo
+                // Red 'M' Logo
                 Image.asset(
                   'assets/images/header_logo.png',
-                  height: 34,
+                  height: 32,
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: AppColors.primaryRed,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text('M', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'MUSIC',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                    letterSpacing: 2.0,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: controller.isBackendConnected ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: controller.isBackendConnected ? Colors.green : Colors.orange,
-                      width: 0.8,
+                    child: const Center(
+                      child: Text('M', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
                     ),
                   ),
-                  child: Text(
-                    controller.isBackendConnected ? 'AWS LIVE' : 'CONNECTING',
-                    style: TextStyle(
-                      color: controller.isBackendConnected ? Colors.greenAccent : Colors.orangeAccent,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
+                ),
+                const SizedBox(width: 12),
+
+                // Inline Search Bar Button matching screenshot
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => controller.setTab(1), // Switch to Search tab
+                    child: Container(
+                      height: 38,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(19),
+                        border: Border.all(color: Colors.white12, width: 0.8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.search_rounded, color: Colors.white.withOpacity(0.6), size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Search titles...',
+                            style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Category / Grid Icon matching screenshot
+                GestureDetector(
+                  onTap: () => controller.setTab(2), // Switch to Playlists tab
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.08),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white12, width: 0.8),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.grid_view_rounded, color: Colors.white, size: 18),
                     ),
                   ),
                 ),
               ],
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 22),
-                onPressed: () => _showSettingsDialog(context),
-              ),
-            ],
           ),
 
-          // Spotlight Hero Header
+          // 2. Category Chips Row matching screenshot (All Titles, Movies/Songs, TV Series/Playlists, etc.)
           SliverToBoxAdapter(
-            child: HeroHeader(
-              song: featured,
-              isDownloaded: controller.downloads.isDownloaded(featured.id),
-              onPlay: () {
-                controller.player.playSong(featured, queueContext: controller.trendingTracks);
-              },
-              onDownload: () {
-                controller.downloads.downloadSong(featured);
-              },
-            ),
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-          // Shelf 1: Trending Top Tracks Carousel
-          SliverToBoxAdapter(
-            child: _buildShelfHeader('TRENDING NOW'),
-          ),
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 180,
-              child: ListView.builder(
+            child: Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: controller.trendingTracks.length,
+                itemCount: MusicController.categories.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
-                  final song = controller.trendingTracks[index];
-                  return _buildTrendingCard(context, song, index + 1);
+                  final cat = MusicController.categories[index];
+                  final isSelected = controller.selectedCategory == cat;
+
+                  return GestureDetector(
+                    onTap: () {
+                      if (cat == 'Playlists') {
+                        controller.setTab(2);
+                      } else {
+                        controller.setCategory(cat);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primaryRed : Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: isSelected ? AppColors.primaryRed : Colors.white12,
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          cat,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white70,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
                 },
               ),
             ),
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 28)),
-
-          // Shelf 2: Quick Picks Vertical List
+          // 3. Spotlight Hero Banner matching Screenshot
           SliverToBoxAdapter(
-            child: _buildShelfHeader('QUICK PICKS FOR YOU'),
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final song = controller.feedRecommendations[index];
-                final isCurrent = controller.player.currentSong?.id == song.id;
-                return SongTile(
-                  song: song,
-                  isPlaying: controller.player.isPlaying,
-                  isCurrentTrack: isCurrent,
-                  isDownloaded: controller.downloads.isDownloaded(song.id),
-                  isDownloading: controller.downloads.isDownloading(song.id),
-                  downloadProgress: controller.downloads.getDownloadProgress(song.id),
-                  onTap: () {
-                    controller.player.playSong(song, queueContext: controller.feedRecommendations);
-                  },
-                  onDownload: () {
-                    controller.downloads.downloadSong(song);
-                  },
-                );
-              },
-              childCount: controller.feedRecommendations.length,
+            child: HeroHeader(
+              song: featured,
+              onPlay: () => controller.playSongWithAuth(context, featured, queueContext: controller.trendingTracks),
+              onAddToList: () => AddToPlaylistSheet.show(context, controller, featured),
+              onInfo: () => _showInfoDialog(context, featured),
             ),
           ),
 
-          // Load More Music Button
+          // 4. "Recommended For You" Header matching Screenshot
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-              child: Center(
-                child: controller.isLoadingMoreFeed
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: CircularProgressIndicator(color: AppColors.primaryRed),
-                      )
-                    : OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: AppColors.primaryRed, width: 1.5),
-                          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                        ),
-                        icon: const Icon(Icons.add_rounded, color: AppColors.primaryRed),
-                        label: const Text(
-                          'LOAD MORE MUSIC',
+              padding: const EdgeInsets.only(left: 16, right: 16, top: 20, bottom: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Recommended For You',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => controller.setTab(1),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'See More',
                           style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.2,
+                            color: AppColors.primaryRed,
                             fontSize: 13,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                        onPressed: controller.loadMoreFeed,
-                      ),
+                        SizedBox(width: 2),
+                        Icon(Icons.chevron_right, color: AppColors.primaryRed, size: 16),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 80)),
+          // 5. Vertical Aspect-Ratio Cards (Movieflix/Netflix Poster Carousel) matching Screenshot
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 220,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: displayRecommended.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final song = displayRecommended[index];
+                  return _buildPosterCard(context, song, displayRecommended);
+                },
+              ),
+            ),
+          ),
+
+          // 6. Intelligent Auto-Mixes Section
+          if (controller.recommendedMixes.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 16, right: 16, top: 28, bottom: 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.auto_awesome, color: AppColors.primaryRed, size: 18),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Personalized Mixes',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 160,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: controller.recommendedMixes.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    final mix = controller.recommendedMixes[index];
+                    return _buildMixPoster(context, mix);
+                  },
+                ),
+              ),
+            ),
+          ],
+
+          // 7. Trending Tracks Feed Section
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, top: 28, bottom: 8),
+              child: const Text(
+                'Trending Hits',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                ),
+              ),
+            ),
+          ),
+
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final song = controller.trendingTracks[index];
+                return SongTile(
+                  song: song,
+                  isPlaying: controller.player.currentSong?.id == song.id && controller.player.isPlaying,
+                  onTap: () => controller.playSongWithAuth(context, song, queueContext: controller.trendingTracks),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.playlist_add, color: Colors.white54, size: 22),
+                    onPressed: () => AddToPlaylistSheet.show(context, controller, song),
+                  ),
+                );
+              },
+              childCount: controller.trendingTracks.length,
+            ),
+          ),
+
+          // 8. "Load More Music" Pagination Button
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Center(
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: OutlinedButton(
+                    onPressed: controller.isLoadingMoreFeed ? null : controller.loadMoreFeed,
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.primaryRed, width: 1.2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                      backgroundColor: Colors.transparent,
+                    ),
+                    child: controller.isLoadingMoreFeed
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(color: AppColors.primaryRed, strokeWidth: 2),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.expand_more_rounded, color: AppColors.primaryRed, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'LOAD MORE MUSIC',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
       ),
     );
   }
 
-  Widget _buildShelfHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 16,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.2,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTrendingCard(BuildContext context, Song song, int rank) {
+  Widget _buildPosterCard(BuildContext context, Song song, List<Song> queue) {
     return GestureDetector(
-      onTap: () {
-        controller.player.playSong(song, queueContext: controller.trendingTracks);
-      },
-      child: Container(
+      onTap: () => controller.playSongWithAuth(context, song, queueContext: queue),
+      child: SizedBox(
         width: 130,
-        margin: const EdgeInsets.only(right: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: song.thumbnailUrl.isNotEmpty
-                      ? Image.network(
-                          song.thumbnailUrl,
-                          width: 130,
-                          height: 130,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 130,
-                            height: 130,
-                            color: AppColors.surfaceHighlight,
-                          ),
-                        )
-                      : Container(
-                          width: 130,
-                          height: 130,
-                          color: AppColors.surfaceHighlight,
-                        ),
-                ),
-                // Netflix-style Rank Number
-                Positioned(
-                  bottom: -6,
-                  left: -2,
-                  child: Text(
-                    '$rank',
-                    style: TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white.withOpacity(0.9),
-                      shadows: [
-                        Shadow(
-                          color: Colors.black.withOpacity(0.9),
-                          blurRadius: 10,
-                          offset: const Offset(2, 2),
-                        ),
-                      ],
+            // Vertical Poster Card matching screenshot
+            Container(
+              height: 165,
+              width: 130,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.5),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    song.thumbnailUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: AppColors.surface,
+                      child: const Icon(Icons.music_note, color: Colors.white30, size: 36),
                     ),
                   ),
-                ),
-              ],
+                  // Subtle top and bottom gradients
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.6),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Play Overlay Button
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primaryRed,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 6),
             Text(
               song.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
             ),
             Text(
               song.artist,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 11,
-              ),
+              style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11),
             ),
           ],
         ),
@@ -294,49 +474,73 @@ class FeedScreen extends StatelessWidget {
     );
   }
 
-  void _showSettingsDialog(BuildContext context) {
-    final textController = TextEditingController(text: controller.apiService.baseUrl);
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('Backend Configuration', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildMixPoster(BuildContext context, dynamic mix) {
+    return GestureDetector(
+      onTap: () {
+        if (mix.tracks.isNotEmpty) {
+          controller.playSongWithAuth(context, mix.tracks.first, queueContext: mix.tracks);
+        }
+      },
+      child: Container(
+        width: 180,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border, width: 0.6),
+        ),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'NextViper Server URL:',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    mix.coverUrl,
+                    width: 50,
+                    height: 50,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(width: 50, height: 50, color: Colors.white12),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        mix.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      Text(
+                        '${mix.tracks.length} tracks',
+                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: textController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                hintText: 'https://34-232-210-74.sslip.io',
-                hintStyle: TextStyle(color: AppColors.textMuted),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
-                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryRed)),
-              ),
+            const Spacer(),
+            Text(
+              mix.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('AUTO MIX', style: TextStyle(color: AppColors.primaryRed, fontSize: 10, fontWeight: FontWeight.bold)),
+                const Icon(Icons.play_circle_fill, color: AppColors.primaryRed, size: 20),
+              ],
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryRed),
-            onPressed: () {
-              controller.apiService.baseUrl = textController.text.trim();
-              Navigator.pop(context);
-              controller.loadInitialFeed();
-            },
-            child: const Text('Save & Reconnect', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }

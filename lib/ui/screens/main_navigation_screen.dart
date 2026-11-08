@@ -2,20 +2,52 @@ import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
 import '../../state/music_controller.dart';
 import '../components/mini_player.dart';
-import 'downloads_screen.dart';
 import 'feed_screen.dart';
-import 'full_player_screen.dart';
 import 'search_screen.dart';
+import 'playlists_screen.dart';
+import 'profile_screen.dart';
+import 'full_player_screen.dart';
 
-class MainNavigationScreen extends StatelessWidget {
+class MainNavigationScreen extends StatefulWidget {
   final MusicController controller;
 
   const MainNavigationScreen({super.key, required this.controller});
 
+  @override
+  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+}
+
+class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: widget.controller.selectedTabIndex);
+    widget.controller.addListener(_syncPageWithController);
+  }
+
+  void _syncPageWithController() {
+    if (_pageController.hasClients && _pageController.page?.round() != widget.controller.selectedTabIndex) {
+      _pageController.animateToPage(
+        widget.controller.selectedTabIndex,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_syncPageWithController);
+    _pageController.dispose();
+    super.dispose();
+  }
+
   void _openFullPlayer(BuildContext context) {
     Navigator.of(context).push(
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => FullPlayerScreen(controller: controller),
+        pageBuilder: (context, animation, secondaryAnimation) => FullPlayerScreen(controller: widget.controller),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           const begin = Offset(0.0, 1.0);
           const end = Offset.zero;
@@ -29,76 +61,173 @@ class MainNavigationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
     final player = controller.player;
     final currentSong = player.currentSong;
+    final currentTab = controller.selectedTabIndex;
 
     final screens = [
       FeedScreen(controller: controller),
       SearchScreen(controller: controller),
-      DownloadsScreen(controller: controller),
+      PlaylistsScreen(controller: controller),
+      ProfileScreen(controller: controller),
     ];
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // Active Screen Tab
-          IndexedStack(
-            index: controller.selectedTabIndex,
+          // 1. Swipeable Screens PageView
+          PageView(
+            controller: _pageController,
+            physics: const BouncingScrollPhysics(),
+            onPageChanged: (index) {
+              controller.setTab(index);
+            },
             children: screens,
           ),
 
-          // Floating Sticky Mini Player above Bottom Bar
+          // 2. Sticky Mini Player sitting directly above Floating Nav Bar
           if (currentSong != null)
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: MiniPlayer(
-                song: currentSong,
-                state: player.state,
-                position: player.position,
-                duration: player.duration,
-                onTogglePlay: player.togglePlayPause,
-                onNext: player.skipNext,
-                onTap: () => _openFullPlayer(context),
+              left: 12,
+              right: 12,
+              bottom: 84, // elevated so it doesn't overlap the floating capsule bar
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: MiniPlayer(
+                  song: currentSong,
+                  state: player.state,
+                  position: player.position,
+                  duration: player.duration,
+                  onTogglePlay: player.togglePlayPause,
+                  onNext: controller.skipNextWithTelemetry,
+                  onTap: () => _openFullPlayer(context),
+                ),
               ),
             ),
+
+          // 3. Floating Capsule Bottom Navigation Bar matching Screenshot
+          Positioned(
+            left: 24,
+            right: 24,
+            bottom: 18,
+            child: SafeArea(
+              top: false,
+              child: Center(
+                child: Container(
+                  height: 56,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xE8181818), // Dark frosted acrylic
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: Colors.white.withOpacity(0.12), width: 0.8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.65),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildNavItem(
+                        index: 0,
+                        icon: Icons.home_filled,
+                        label: 'Home',
+                        isActive: currentTab == 0,
+                        onTap: () => controller.setTab(0),
+                      ),
+                      const SizedBox(width: 4),
+                      _buildNavItem(
+                        index: 1,
+                        icon: Icons.search_rounded,
+                        label: 'Search',
+                        isActive: currentTab == 1,
+                        onTap: () => controller.setTab(1),
+                      ),
+                      const SizedBox(width: 4),
+                      _buildNavItem(
+                        index: 2,
+                        icon: Icons.queue_music_rounded,
+                        label: 'Playlists',
+                        isActive: currentTab == 2,
+                        onTap: () => controller.setTab(2),
+                      ),
+                      const SizedBox(width: 4),
+                      _buildNavItem(
+                        index: 3,
+                        icon: Icons.person_outline_rounded,
+                        activeIcon: Icons.person_rounded,
+                        label: 'Me',
+                        isActive: currentTab == 3,
+                        onTap: () => controller.setTab(3),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
+    );
+  }
 
-      // Minimalist Netflix Bottom Navigation Bar
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(top: BorderSide(color: AppColors.border, width: 0.6)),
+  Widget _buildNavItem({
+    required int index,
+    required IconData icon,
+    IconData? activeIcon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.symmetric(
+          horizontal: isActive ? 16 : 12,
+          vertical: 6,
         ),
-        child: BottomNavigationBar(
-          currentIndex: controller.selectedTabIndex,
-          onTap: (index) => controller.setTab(index),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          selectedItemColor: AppColors.primaryRed,
-          unselectedItemColor: AppColors.iconUnselected,
-          selectedFontSize: 11,
-          unselectedFontSize: 11,
-          type: BottomNavigationBarType.fixed,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_filled),
-              activeIcon: Icon(Icons.home_filled, color: AppColors.primaryRed),
-              label: 'Feed',
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primaryRed : Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: AppColors.primaryRed.withOpacity(0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isActive ? (activeIcon ?? icon) : icon,
+              color: isActive ? Colors.white : Colors.white60,
+              size: 20,
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.search_rounded),
-              activeIcon: Icon(Icons.search_rounded, color: AppColors.primaryRed),
-              label: 'Search',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.file_download_outlined),
-              activeIcon: Icon(Icons.file_download_rounded, color: AppColors.primaryRed),
-              label: 'Downloads',
-            ),
+            if (isActive) ...[
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -7,6 +7,8 @@ class Song {
   final String? streamUrl;
   final bool isDownloaded;
   final String? localFilePath;
+  final String genre;
+  final double popularity;
 
   const Song({
     required this.id,
@@ -17,6 +19,8 @@ class Song {
     this.streamUrl,
     this.isDownloaded = false,
     this.localFilePath,
+    this.genre = 'Pop',
+    this.popularity = 0.95,
   });
 
   Song copyWith({
@@ -28,6 +32,8 @@ class Song {
     String? streamUrl,
     bool? isDownloaded,
     String? localFilePath,
+    String? genre,
+    double? popularity,
   }) {
     return Song(
       id: id ?? this.id,
@@ -38,6 +44,8 @@ class Song {
       streamUrl: streamUrl ?? this.streamUrl,
       isDownloaded: isDownloaded ?? this.isDownloaded,
       localFilePath: localFilePath ?? this.localFilePath,
+      genre: genre ?? this.genre,
+      popularity: popularity ?? this.popularity,
     );
   }
 
@@ -47,10 +55,12 @@ class Song {
       title: json['title'] as String? ?? 'Unknown Title',
       artist: json['artist'] as String? ?? 'Unknown Artist',
       duration: json['duration'] as String? ?? '',
-      thumbnailUrl: json['thumbnail'] as String? ?? '',
+      thumbnailUrl: (json['thumbnail'] ?? json['thumbnailUrl']) as String? ?? '',
       streamUrl: json['streamUrl'] as String?,
       isDownloaded: json['isDownloaded'] as bool? ?? false,
       localFilePath: json['localFilePath'] as String?,
+      genre: json['genre'] as String? ?? 'Pop',
+      popularity: (json['popularity'] as num?)?.toDouble() ?? 0.95,
     );
   }
 
@@ -64,6 +74,8 @@ class Song {
       'streamUrl': streamUrl,
       'isDownloaded': isDownloaded,
       'localFilePath': localFilePath,
+      'genre': genre,
+      'popularity': popularity,
     };
   }
 

@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'constants/colors.dart';
 import 'services/api_service.dart';
+import 'services/auth_service.dart';
 import 'state/music_controller.dart';
 import 'ui/screens/main_navigation_screen.dart';
+import 'ui/screens/auth_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Set system UI style (transparent dark status bar)
@@ -14,30 +16,42 @@ void main() {
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: AppColors.surface,
+      systemNavigationBarColor: AppColors.background,
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
 
-  runApp(const ViperMusicApp());
+  final apiService = ApiService();
+  final authService = AuthService(apiService: apiService);
+  await authService.initialize();
+
+  runApp(ViperMusicApp(apiService: apiService, authService: authService));
 }
 
 class ViperMusicApp extends StatefulWidget {
-  const ViperMusicApp({super.key});
+  final ApiService apiService;
+  final AuthService authService;
+
+  const ViperMusicApp({
+    super.key,
+    required this.apiService,
+    required this.authService,
+  });
 
   @override
   State<ViperMusicApp> createState() => _ViperMusicAppState();
 }
 
 class _ViperMusicAppState extends State<ViperMusicApp> {
-  late final ApiService _apiService;
   late final MusicController _controller;
 
   @override
   void initState() {
     super.initState();
-    _apiService = ApiService();
-    _controller = MusicController(apiService: _apiService);
+    _controller = MusicController(
+      apiService: widget.apiService,
+      authService: widget.authService,
+    );
   }
 
   @override
@@ -68,7 +82,11 @@ class _ViperMusicAppState extends State<ViperMusicApp> {
               ThemeData.dark().textTheme,
             ),
           ),
-          home: MainNavigationScreen(controller: _controller),
+          initialRoute: '/',
+          routes: {
+            '/': (context) => MainNavigationScreen(controller: _controller),
+            '/auth': (context) => AuthScreen(authService: widget.authService),
+          },
         );
       },
     );

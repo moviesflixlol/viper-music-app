@@ -3,6 +3,7 @@ import '../../constants/colors.dart';
 import '../../models/song.dart';
 import '../../services/audio_player_service.dart';
 import '../../state/music_controller.dart';
+import '../components/add_to_playlist_sheet.dart';
 
 class FullPlayerScreen extends StatelessWidget {
   final MusicController controller;
@@ -166,6 +167,10 @@ class FullPlayerScreen extends StatelessWidget {
                     ),
                   ),
                   IconButton(
+                    icon: const Icon(Icons.playlist_add_rounded, color: Colors.white, size: 26),
+                    onPressed: () => AddToPlaylistSheet.show(context, controller, song),
+                  ),
+                  IconButton(
                     icon: isDownloading
                         ? const SizedBox(
                             width: 22,
@@ -283,7 +288,7 @@ class FullPlayerScreen extends StatelessWidget {
                   // Next
                   IconButton(
                     icon: const Icon(Icons.skip_next_rounded, color: Colors.white, size: 36),
-                    onPressed: player.skipNext,
+                    onPressed: controller.skipNextWithTelemetry,
                   ),
 
                   // Repeat
