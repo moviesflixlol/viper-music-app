@@ -637,10 +637,9 @@ class CuratedPodcast {
       id: 'pod_${query.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}',
       title: title,
       artist: show,
-      album: 'Podcast',
-      durationSeconds: 3600,
+      duration: '45:00',
       thumbnailUrl: imageUrl,
-      source: 'youtube',
+      genre: 'Podcast',
     );
   }
 }
