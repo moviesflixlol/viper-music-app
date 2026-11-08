@@ -211,6 +211,17 @@ class AudioPlayerService extends ChangeNotifier {
     await _player.pause();
   }
 
+  Future<void> stop() async {
+    if (kIsWeb && WebAudioBridge.isSupported) {
+      WebAudioBridge.pause();
+    } else {
+      await _player.stop();
+    }
+    _currentSong = null;
+    _state = PlaybackState.idle;
+    notifyListeners();
+  }
+
   Future<void> togglePlayPause() async => isPlaying ? await pause() : await resume();
 
   Future<void> seek(Duration position) async {
