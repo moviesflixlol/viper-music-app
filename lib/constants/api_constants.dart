@@ -12,8 +12,12 @@ class ApiConstants {
 
   // Auth Endpoints
   static const String registerEndpoint = '/api/auth/register';
+  static const String verifyEmailEndpoint = '/api/auth/verify-email';
   static const String loginEndpoint = '/api/auth/login';
   static const String meEndpoint = '/api/auth/me';
+  static const String forgotPasswordEndpoint = '/api/auth/forgot-password';
+  static const String resetPasswordEndpoint = '/api/auth/reset-password';
+  static const String resendCodeEndpoint = '/api/auth/resend-code';
 
   // Playlist Endpoints
   static const String playlistsEndpoint = '/api/playlists';

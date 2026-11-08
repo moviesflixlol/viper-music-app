@@ -56,7 +56,7 @@ class FullPlayerScreen extends StatelessWidget {
                   Column(
                     children: [
                       const Text(
-                        'PLAYING FROM NEXTVIPER',
+                        'PLAYING FROM VIPER STREAM',
                         style: TextStyle(
                           color: AppColors.primaryRed,
                           fontSize: 10,

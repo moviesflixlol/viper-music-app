@@ -72,11 +72,52 @@ class AuthService extends ChangeNotifier {
     required String email,
     required String password,
     String name = 'Viper User',
+    List<String> interests = const [],
   }) async {
     _isLoading = true;
     notifyListeners();
 
-    final result = await _apiService.register(email: email, password: password, name: name);
+    final result = await _apiService.register(
+      email: email,
+      password: password,
+      name: name,
+      interests: interests,
+    );
+    _isLoading = false;
+
+    if (result['success'] == true) {
+      if (result['verificationRequired'] == true) {
+        notifyListeners();
+        return {
+          'success': true,
+          'verificationRequired': true,
+          'email': email,
+          'message': result['message'] ?? 'Verification code sent to your email',
+        };
+      }
+      _token = result['token'] as String;
+      _currentUser = result['user'] as UserModel;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyToken, _token!);
+      await prefs.setString(_keyUser, jsonEncode(_currentUser!.toJson()));
+
+      notifyListeners();
+      return {'success': true};
+    } else {
+      notifyListeners();
+      return {'success': false, 'error': result['error'] ?? 'Registration failed'};
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyEmail({
+    required String email,
+    required String code,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final result = await _apiService.verifyEmail(email: email, code: code);
     _isLoading = false;
 
     if (result['success'] == true) {
@@ -91,8 +132,41 @@ class AuthService extends ChangeNotifier {
       return {'success': true};
     } else {
       notifyListeners();
-      return {'success': false, 'error': result['error'] ?? 'Registration failed'};
+      return {'success': false, 'error': result['error'] ?? 'Verification failed'};
     }
+  }
+
+  Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    _isLoading = true;
+    notifyListeners();
+    final result = await _apiService.forgotPassword(email: email);
+    _isLoading = false;
+    notifyListeners();
+    return result;
+  }
+
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+    final result = await _apiService.resetPassword(
+      email: email,
+      code: code,
+      newPassword: newPassword,
+    );
+    _isLoading = false;
+    notifyListeners();
+    return result;
+  }
+
+  Future<Map<String, dynamic>> resendCode({
+    required String email,
+    String type = 'signup',
+  }) async {
+    return await _apiService.resendCode(email: email, type: type);
   }
 
   Future<void> logout() async {

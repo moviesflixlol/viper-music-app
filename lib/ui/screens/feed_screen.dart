@@ -6,6 +6,7 @@ import '../../state/music_controller.dart';
 import '../components/song_tile.dart';
 import '../components/add_to_playlist_sheet.dart';
 import 'playlists_screen.dart';
+import 'artist_detail_screen.dart';
 
 class FeedScreen extends StatelessWidget {
   final MusicController controller;
@@ -18,6 +19,23 @@ class FeedScreen extends StatelessWidget {
         builder: (ctx) => PlaylistDetailScreen(controller: controller, playlist: playlist),
       ),
     );
+  }
+
+  void _playCuratedPodcast(BuildContext context, CuratedPodcast pod) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Streaming "${pod.title}"...'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+    try {
+      final results = await controller.apiService.search(pod.query);
+      if (results.isNotEmpty) {
+        controller.playSong(results.first);
+        return;
+      }
+    } catch (_) {}
+    controller.playSong(pod.toSong());
   }
 
   @override
@@ -49,32 +67,19 @@ class FeedScreen extends StatelessWidget {
             titleSpacing: 16,
             title: Row(
               children: [
-                // Real M Header PNG Logo (Matching original design)
+                // Clean Header Logo without circular border
                 GestureDetector(
                   onTap: () => controller.setTab(3), // Open profile
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.black,
-                      border: Border.all(color: AppColors.primaryRed.withOpacity(0.6), width: 1.2),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Image.asset(
-                      'assets/images/header_logo.png',
-                      width: 36,
-                      height: 36,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Center(
-                        child: Text(
-                          'M',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18,
-                          ),
-                        ),
+                  child: Image.asset(
+                    'assets/images/header_logo.png',
+                    height: 34,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Text(
+                      'M',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 22,
                       ),
                     ),
                   ),
@@ -252,7 +257,12 @@ class FeedScreen extends StatelessWidget {
             ),
           ),
 
-          // 4. "Popular artists" Section with Circular Avatars matching Screenshot 4
+          // 4. "Best episodes of the week" Section matching Screenshot 1 & 2
+          SliverToBoxAdapter(
+            child: _buildBestEpisodesSection(context),
+          ),
+
+          // 5. "Popular artists" Section with Circular Avatars matching Screenshot 4
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
@@ -275,8 +285,14 @@ class FeedScreen extends StatelessWidget {
                   final artist = artists[index];
                   return GestureDetector(
                     onTap: () {
-                      controller.setTab(1); // Switch to search
-                      controller.search(artist.name);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ArtistDetailScreen(
+                            artist: artist,
+                            controller: controller,
+                          ),
+                        ),
+                      );
                     },
                     child: SizedBox(
                       width: 105,
@@ -491,4 +507,179 @@ class FeedScreen extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildBestEpisodesSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
+          child: Text(
+            'Best episodes of the week',
+            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+          ),
+        ),
+        SizedBox(
+          height: 235,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _curatedPodcasts.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            itemBuilder: (context, index) {
+              final pod = _curatedPodcasts[index];
+              return GestureDetector(
+                onTap: () => _playCuratedPodcast(context, pod),
+                child: SizedBox(
+                  width: 155,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Stack(
+                          children: [
+                            Image.network(
+                              pod.imageUrl,
+                              width: 155,
+                              height: 155,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 155,
+                                height: 155,
+                                color: AppColors.surface,
+                                child: const Icon(Icons.podcasts, color: Colors.white30, size: 40),
+                              ),
+                            ),
+                            Positioned(
+                              top: 8,
+                              left: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.mic, color: Colors.greenAccent, size: 12),
+                                    SizedBox(width: 3),
+                                    Text('PODCAST', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 8,
+                              right: 8,
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryRed,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.4),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        pod.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        pod.show,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
 }
+
+class CuratedPodcast {
+  final String title;
+  final String show;
+  final String imageUrl;
+  final String query;
+
+  const CuratedPodcast({
+    required this.title,
+    required this.show,
+    required this.imageUrl,
+    required this.query,
+  });
+
+  Song toSong() {
+    return Song(
+      id: 'pod_${query.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}',
+      title: title,
+      artist: show,
+      album: 'Podcast',
+      durationSeconds: 3600,
+      thumbnailUrl: imageUrl,
+      source: 'youtube',
+    );
+  }
+}
+
+final List<CuratedPodcast> _curatedPodcasts = [
+  const CuratedPodcast(
+    title: 'Sam Altman On AI Revolution, Superintelligence...',
+    show: 'Figuring Out • Raj Shamani',
+    imageUrl: 'https://i.ytimg.com/vi/H58vbez_m4E/hqdefault.jpg',
+    query: 'Sam Altman Figuring Out',
+  ),
+  const CuratedPodcast(
+    title: 'Sitting: As Bad As Smoking?!',
+    show: 'Science Vs • Spotify Original',
+    imageUrl: 'https://i.scdn.co/image/ab6765630000ba8aa2e2fb4209930773d328dd4c',
+    query: 'Science Vs Sitting As Bad As Smoking',
+  ),
+  const CuratedPodcast(
+    title: 'How Dopamine Drives Motivation & Focus',
+    show: 'Huberman Lab • Dr. Andrew Huberman',
+    imageUrl: 'https://i.ytimg.com/vi/QmOF0crdyRU/hqdefault.jpg',
+    query: 'Huberman Lab Dopamine Motivation',
+  ),
+  const CuratedPodcast(
+    title: 'Deepinder Goyal: The Story Behind Zomato',
+    show: 'The Ranveer Show (TRS)',
+    imageUrl: 'https://i.ytimg.com/vi/rYEDA3JcQqw/hqdefault.jpg',
+    query: 'Deepinder Goyal The Ranveer Show',
+  ),
+  const CuratedPodcast(
+    title: 'Elon Musk: Mars, AI & Neuralink',
+    show: 'The Joe Rogan Experience #1169',
+    imageUrl: 'https://i.ytimg.com/vi/ycPr5-FLMQg/hqdefault.jpg',
+    query: 'Joe Rogan Elon Musk Neuralink',
+  ),
+  const CuratedPodcast(
+    title: 'WTF is Happening in India? Startups & Tech',
+    show: 'WTF with Nikhil Kamath',
+    imageUrl: 'https://i.ytimg.com/vi/u5V0ZpQYkQo/hqdefault.jpg',
+    query: 'WTF with Nikhil Kamath Startups',
+  ),
+];

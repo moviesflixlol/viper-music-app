@@ -40,7 +40,7 @@ class _SearchScreenState extends State<SearchScreen> {
     SearchCategory(
       title: 'Podcasts',
       color: Color(0xFF00796B),
-      query: 'podcast',
+      query: 'trending podcasts english hindi',
       imageUrl: 'https://i.scdn.co/image/ab6765630000ba8aa2e2fb4209930773d328dd4c',
     ),
     SearchCategory(
@@ -109,26 +109,13 @@ class _SearchScreenState extends State<SearchScreen> {
                 children: [
                   GestureDetector(
                     onTap: () => controller.setTab(3),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.black,
-                        border: Border.all(color: AppColors.primaryRed.withOpacity(0.6), width: 1.2),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Image.asset(
-                        'assets/images/header_logo.png',
-                        width: 36,
-                        height: 36,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Center(
-                          child: Text(
-                            'M',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
-                          ),
-                        ),
+                    child: Image.asset(
+                      'assets/images/header_logo.png',
+                      height: 34,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Text(
+                        'M',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22),
                       ),
                     ),
                   ),

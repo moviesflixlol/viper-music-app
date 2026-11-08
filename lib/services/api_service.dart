@@ -213,23 +213,126 @@ class ApiService {
     required String email,
     required String password,
     String name = 'Viper User',
+    List<String> interests = const [],
   }) async {
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.registerEndpoint}');
       final response = await http.post(
         uri,
         headers: _buildHeaders(),
-        body: jsonEncode({'email': email, 'password': password, 'name': name}),
-      ).timeout(const Duration(seconds: 8));
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          'name': name,
+          'interests': interests,
+        }),
+      ).timeout(const Duration(seconds: 10));
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (data['verificationRequired'] == true) {
+          return {
+            'success': true,
+            'verificationRequired': true,
+            'email': email,
+            'message': data['message'] ?? 'Verification code sent to your email',
+          };
+        }
         final token = data['token'] as String? ?? '';
         final userJson = data['user'] as Map<String, dynamic>? ?? {};
         final user = UserModel.fromJson(userJson, token: token);
         return {'success': true, 'user': user, 'token': token};
       }
       return {'success': false, 'error': data['error'] ?? 'Registration failed'};
+    } catch (e) {
+      return {'success': false, 'error': 'Connection error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyEmail({
+    required String email,
+    required String code,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl${ApiConstants.verifyEmailEndpoint}');
+      final response = await http.post(
+        uri,
+        headers: _buildHeaders(),
+        body: jsonEncode({'email': email, 'code': code}),
+      ).timeout(const Duration(seconds: 10));
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final token = data['token'] as String? ?? '';
+        final userJson = data['user'] as Map<String, dynamic>? ?? {};
+        final user = UserModel.fromJson(userJson, token: token);
+        return {'success': true, 'user': user, 'token': token};
+      }
+      return {'success': false, 'error': data['error'] ?? 'Verification failed'};
+    } catch (e) {
+      return {'success': false, 'error': 'Connection error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    try {
+      final uri = Uri.parse('$baseUrl${ApiConstants.forgotPasswordEndpoint}');
+      final response = await http.post(
+        uri,
+        headers: _buildHeaders(),
+        body: jsonEncode({'email': email}),
+      ).timeout(const Duration(seconds: 10));
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': data['message'] ?? 'Password reset code sent'};
+      }
+      return {'success': false, 'error': data['error'] ?? 'Request failed'};
+    } catch (e) {
+      return {'success': false, 'error': 'Connection error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl${ApiConstants.resetPasswordEndpoint}');
+      final response = await http.post(
+        uri,
+        headers: _buildHeaders(),
+        body: jsonEncode({'email': email, 'code': code, 'newPassword': newPassword}),
+      ).timeout(const Duration(seconds: 10));
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': data['message'] ?? 'Password reset successfully'};
+      }
+      return {'success': false, 'error': data['error'] ?? 'Reset failed'};
+    } catch (e) {
+      return {'success': false, 'error': 'Connection error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> resendCode({
+    required String email,
+    String type = 'signup',
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl${ApiConstants.resendCodeEndpoint}');
+      final response = await http.post(
+        uri,
+        headers: _buildHeaders(),
+        body: jsonEncode({'email': email, 'type': type}),
+      ).timeout(const Duration(seconds: 10));
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': data['message'] ?? 'Code resent'};
+      }
+      return {'success': false, 'error': data['error'] ?? 'Resend failed'};
     } catch (e) {
       return {'success': false, 'error': 'Connection error: $e'};
     }

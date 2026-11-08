@@ -136,7 +136,7 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // Production Server Info Card
+          // Audio Quality & App Info
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -149,16 +149,16 @@ class ProfileScreen extends StatelessWidget {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.cloud_done_rounded, color: Colors.greenAccent, size: 18),
+                    Icon(Icons.high_quality_rounded, color: Colors.greenAccent, size: 20),
                     SizedBox(width: 8),
-                    Text('AWS Production Backend', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Text('Audio & Streaming Quality', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Runtime: Pure NextViper 1.0.0 (Apex)\nHost: AWS EC2 (34.232.210.74)\nSecurity: TLS 1.3 / Let\'s Encrypt / PBKDF2 Hashing\nAlgorithm: Intelligent Hybrid Recommendation Engine',
-                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12, height: 1.5),
-                ),
+                const SizedBox(height: 12),
+                _buildPreferenceRow('Streaming Bitrate', '320 kbps (Lossless Hi-Fi)'),
+                _buildPreferenceRow('Audio Codec', 'Viper Audio Stream'),
+                _buildPreferenceRow('Equalizer', 'Viper Dynamic Clarity'),
+                _buildPreferenceRow('App Version', '2.0.0 (Production)'),
               ],
             ),
           ),
@@ -200,6 +200,19 @@ class ProfileScreen extends StatelessWidget {
         const SizedBox(height: 2),
         Text(label, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
       ],
+    );
+  }
+
+  Widget _buildPreferenceRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
+          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+        ],
+      ),
     );
   }
 }
