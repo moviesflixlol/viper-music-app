@@ -1,38 +1,21 @@
 import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
+import '../../models/playlist.dart';
 import '../../models/song.dart';
 import '../../state/music_controller.dart';
-import '../components/hero_header.dart';
 import '../components/song_tile.dart';
 import '../components/add_to_playlist_sheet.dart';
+import 'playlists_screen.dart';
 
 class FeedScreen extends StatelessWidget {
   final MusicController controller;
 
   const FeedScreen({super.key, required this.controller});
 
-  void _showInfoDialog(BuildContext context, Song song) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: Text(song.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Artist: ${song.artist}', style: const TextStyle(color: Colors.white70)),
-            const SizedBox(height: 6),
-            Text('Genre: ${song.genre}', style: const TextStyle(color: Colors.white70)),
-            const SizedBox(height: 6),
-            Text('Duration: ${song.duration}', style: const TextStyle(color: Colors.white70)),
-            const SizedBox(height: 6),
-            Text('Match Score: ${(song.popularity * 100).toInt()}%', style: const TextStyle(color: AppColors.primaryRed, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close', style: TextStyle(color: Colors.white70))),
-        ],
+  void _openPlaylistDetail(BuildContext context, Playlist playlist) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => PlaylistDetailScreen(controller: controller, playlist: playlist),
       ),
     );
   }
@@ -45,104 +28,94 @@ class FeedScreen extends StatelessWidget {
       );
     }
 
-    final featured = controller.featuredSong ??
-        (controller.trendingTracks.isNotEmpty
-            ? controller.trendingTracks.first
-            : const Song(
-                id: '4NRXx6U8ABQ',
-                title: 'Blinding Lights',
-                artist: 'The Weeknd',
-                thumbnailUrl: 'https://i.ytimg.com/vi/4NRXx6U8ABQ/hqdefault.jpg',
-              ));
-
-    // Filter recommended tracks by category if not 'All Titles'
-    List<Song> displayRecommended = controller.feedRecommendations;
-    if (controller.selectedCategory == 'Songs') {
-      displayRecommended = controller.feedRecommendations;
-    } else if (controller.selectedCategory == 'Trending') {
-      displayRecommended = controller.trendingTracks;
-    } else if (controller.selectedCategory == 'Chill') {
-      displayRecommended = controller.feedRecommendations.where((s) => s.genre == 'Acoustic' || s.genre == 'Chill').toList();
-      if (displayRecommended.isEmpty) displayRecommended = controller.feedRecommendations;
-    } else if (controller.selectedCategory == 'Workout') {
-      displayRecommended = controller.feedRecommendations.where((s) => s.genre == 'Hip-Hop' || s.genre == 'Electronic' || s.genre == 'Rock').toList();
-      if (displayRecommended.isEmpty) displayRecommended = controller.feedRecommendations;
-    }
+    final startListening = controller.trendingTracks.take(4).toList();
+    final recommended = controller.feedRecommendations;
+    final charts = MusicController.curatedPlaylists;
+    final artists = MusicController.popularArtists;
 
     return RefreshIndicator(
       color: AppColors.primaryRed,
       backgroundColor: AppColors.surface,
       onRefresh: controller.loadInitialFeed,
       child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         slivers: [
-          // 1. Sleek Header matching Screenshot (M Logo + Inline Search + Grid Icon)
+          // 1. Spotify-Style Header (Avatar + Filter Pills [ All ] [ Music ] [ Podcasts ])
           SliverAppBar(
-            backgroundColor: AppColors.background.withOpacity(0.92),
+            backgroundColor: AppColors.background.withOpacity(0.95),
             floating: true,
-            pinned: false,
+            pinned: true,
             elevation: 0,
             titleSpacing: 16,
             title: Row(
               children: [
-                // Red 'M' Logo
-                Image.asset(
-                  'assets/images/header_logo.png',
-                  height: 32,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryRed,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Center(
-                      child: Text('M', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Inline Search Bar Button matching screenshot
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => controller.setTab(1), // Switch to Search tab
-                    child: Container(
-                      height: 38,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(19),
-                        border: Border.all(color: Colors.white12, width: 0.8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.search_rounded, color: Colors.white.withOpacity(0.6), size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Search titles...',
-                            style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Category / Grid Icon matching screenshot
+                // Circular 'M' Avatar
                 GestureDetector(
-                  onTap: () => controller.setTab(2), // Switch to Playlists tab
+                  onTap: () => controller.setTab(3), // Open profile
                   child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
+                    width: 34,
+                    height: 34,
+                    decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white12, width: 0.8),
+                      gradient: LinearGradient(
+                        colors: [AppColors.primaryRed, Color(0xFFB80710)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                     ),
                     child: const Center(
-                      child: Icon(Icons.grid_view_rounded, color: Colors.white, size: 18),
+                      child: Text(
+                        'M',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Category Filter Pills matching Screenshot 2, 3, 5
+                Expanded(
+                  child: SizedBox(
+                    height: 34,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: MusicController.categories.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final cat = MusicController.categories[index];
+                        final isSelected = controller.selectedCategory == cat;
+
+                        return GestureDetector(
+                          onTap: () {
+                            if (cat == 'Charts') {
+                              controller.setTab(2); // Jump to Playlists
+                            } else {
+                              controller.setCategory(cat);
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isSelected ? AppColors.primaryRed : Colors.white.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(17),
+                            ),
+                            child: Center(
+                              child: Text(
+                                cat,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.white.withOpacity(0.85),
+                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -150,47 +123,123 @@ class FeedScreen extends StatelessWidget {
             ),
           ),
 
-          // 2. Category Chips Row matching screenshot (All Titles, Movies/Songs, TV Series/Playlists, etc.)
+          // 2. "Start listening" Section matching Screenshot 5
           SliverToBoxAdapter(
-            child: Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Jump into a session based on your tastes',
+                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Start listening',
+                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Start listening items
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final song = startListening[index];
+                final isCurrent = controller.player.currentSong?.id == song.id;
+                return SongTile(
+                  song: song,
+                  isPlaying: isCurrent && controller.player.isPlaying,
+                  isCurrentTrack: isCurrent,
+                  onTap: () => controller.playSong(song, queueContext: startListening),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.playlist_add, color: Colors.white60, size: 22),
+                        onPressed: () => AddToPlaylistSheet.show(context, controller, song),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              childCount: startListening.length,
+            ),
+          ),
+
+          // 3. "Charts & Hot Hits" Section matching Screenshot 2 & 3
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Charts',
+                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                  ),
+                  GestureDetector(
+                    onTap: () => controller.setTab(2),
+                    child: const Text(
+                      'See all',
+                      style: TextStyle(color: AppColors.primaryRed, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 215,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: MusicController.categories.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemCount: charts.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 14),
                 itemBuilder: (context, index) {
-                  final cat = MusicController.categories[index];
-                  final isSelected = controller.selectedCategory == cat;
-
+                  final pl = charts[index];
                   return GestureDetector(
-                    onTap: () {
-                      if (cat == 'Playlists') {
-                        controller.setTab(2);
-                      } else {
-                        controller.setCategory(cat);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primaryRed : Colors.white.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: isSelected ? AppColors.primaryRed : Colors.white12,
-                          width: 0.8,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          cat,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.white70,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                            fontSize: 13,
+                    onTap: () => _openPlaylistDetail(context, pl),
+                    child: SizedBox(
+                      width: 145,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              pl.coverUrl,
+                              width: 145,
+                              height: 145,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 145,
+                                height: 145,
+                                color: AppColors.surface,
+                                child: const Icon(Icons.queue_music, color: Colors.white30, size: 40),
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          Text(
+                            pl.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            pl.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11, height: 1.2),
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -199,123 +248,173 @@ class FeedScreen extends StatelessWidget {
             ),
           ),
 
-          // 3. Spotlight Hero Banner matching Screenshot
-          SliverToBoxAdapter(
-            child: HeroHeader(
-              song: featured,
-              onPlay: () => controller.playSongWithAuth(context, featured, queueContext: controller.trendingTracks),
-              onAddToList: () => AddToPlaylistSheet.show(context, controller, featured),
-              onInfo: () => _showInfoDialog(context, featured),
-            ),
-          ),
-
-          // 4. "Recommended For You" Header matching Screenshot
+          // 4. "Popular artists" Section with Circular Avatars matching Screenshot 4
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, top: 20, bottom: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Recommended For You',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () => controller.setTab(1),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'See More',
-                          style: TextStyle(
-                            color: AppColors.primaryRed,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        SizedBox(width: 2),
-                        Icon(Icons.chevron_right, color: AppColors.primaryRed, size: 16),
-                      ],
-                    ),
-                  ),
-                ],
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+              child: const Text(
+                'Popular artists',
+                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
               ),
             ),
           ),
 
-          // 5. Vertical Aspect-Ratio Cards (Movieflix/Netflix Poster Carousel) matching Screenshot
           SliverToBoxAdapter(
             child: SizedBox(
-              height: 220,
+              height: 160,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: displayRecommended.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemCount: artists.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 16),
                 itemBuilder: (context, index) {
-                  final song = displayRecommended[index];
-                  return _buildPosterCard(context, song, displayRecommended);
+                  final artist = artists[index];
+                  return GestureDetector(
+                    onTap: () {
+                      controller.setTab(1); // Switch to search
+                      controller.search(artist.name);
+                    },
+                    child: SizedBox(
+                      width: 105,
+                      child: Column(
+                        children: [
+                          // Circular Artist Photo
+                          Container(
+                            width: 105,
+                            height: 105,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.5),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Image.network(
+                              artist.imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: AppColors.surface,
+                                child: const Icon(Icons.person, color: Colors.white30, size: 36),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            artist.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          Text(
+                            artist.genre,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
                 },
               ),
             ),
           ),
 
-          // 6. Intelligent Auto-Mixes Section
-          if (controller.recommendedMixes.isNotEmpty) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, top: 28, bottom: 12),
-                child: Row(
-                  children: [
-                    const Icon(Icons.auto_awesome, color: AppColors.primaryRed, size: 18),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Personalized Mixes',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: 160,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: controller.recommendedMixes.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final mix = controller.recommendedMixes[index];
-                    return _buildMixPoster(context, mix);
-                  },
-                ),
-              ),
-            ),
-          ],
-
-          // 7. Trending Tracks Feed Section
+          // 5. "Recommended For You" Section matching Screenshot 2
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, top: 28, bottom: 8),
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+              child: const Text(
+                'Recommended For You',
+                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 200,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: recommended.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 14),
+                itemBuilder: (context, index) {
+                  final song = recommended[index];
+                  return GestureDetector(
+                    onTap: () => controller.playSong(song, queueContext: recommended),
+                    child: SizedBox(
+                      width: 135,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Stack(
+                              children: [
+                                Image.network(
+                                  song.thumbnailUrl,
+                                  width: 135,
+                                  height: 135,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 135,
+                                    height: 135,
+                                    color: AppColors.surface,
+                                    child: const Icon(Icons.album, color: Colors.white30, size: 36),
+                                  ),
+                                ),
+                                Positioned(
+                                  right: 6,
+                                  bottom: 6,
+                                  child: Container(
+                                    width: 30,
+                                    height: 30,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.primaryRed,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            song.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          Text(
+                            song.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
+          // 6. "Trending Hits" Vertical List
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
               child: const Text(
                 'Trending Hits',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.4,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
               ),
             ),
           ),
@@ -324,10 +423,12 @@ class FeedScreen extends StatelessWidget {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final song = controller.trendingTracks[index];
+                final isCurrent = controller.player.currentSong?.id == song.id;
                 return SongTile(
                   song: song,
-                  isPlaying: controller.player.currentSong?.id == song.id && controller.player.isPlaying,
-                  onTap: () => controller.playSongWithAuth(context, song, queueContext: controller.trendingTracks),
+                  isPlaying: isCurrent && controller.player.isPlaying,
+                  isCurrentTrack: isCurrent,
+                  onTap: () => controller.playSong(song, queueContext: controller.trendingTracks),
                   trailing: IconButton(
                     icon: const Icon(Icons.playlist_add, color: Colors.white54, size: 22),
                     onPressed: () => AddToPlaylistSheet.show(context, controller, song),
@@ -338,7 +439,7 @@ class FeedScreen extends StatelessWidget {
             ),
           ),
 
-          // 8. "Load More Music" Pagination Button
+          // 7. "Load More Music" Pagination Button
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -381,166 +482,8 @@ class FeedScreen extends StatelessWidget {
             ),
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          const SliverToBoxAdapter(child: SizedBox(height: 110)),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPosterCard(BuildContext context, Song song, List<Song> queue) {
-    return GestureDetector(
-      onTap: () => controller.playSongWithAuth(context, song, queueContext: queue),
-      child: SizedBox(
-        width: 130,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Vertical Poster Card matching screenshot
-            Container(
-              height: 165,
-              width: 130,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    song.thumbnailUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: AppColors.surface,
-                      child: const Icon(Icons.music_note, color: Colors.white30, size: 36),
-                    ),
-                  ),
-                  // Subtle top and bottom gradients
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withOpacity(0.6),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Play Overlay Button
-                  Positioned(
-                    right: 8,
-                    bottom: 8,
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primaryRed,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              song.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              song.artist,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMixPoster(BuildContext context, dynamic mix) {
-    return GestureDetector(
-      onTap: () {
-        if (mix.tracks.isNotEmpty) {
-          controller.playSongWithAuth(context, mix.tracks.first, queueContext: mix.tracks);
-        }
-      },
-      child: Container(
-        width: 180,
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border, width: 0.6),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    mix.coverUrl,
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(width: 50, height: 50, color: Colors.white12),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        mix.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      Text(
-                        '${mix.tracks.length} tracks',
-                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const Spacer(),
-            Text(
-              mix.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('AUTO MIX', style: TextStyle(color: AppColors.primaryRed, fontSize: 10, fontWeight: FontWeight.bold)),
-                const Icon(Icons.play_circle_fill, color: AppColors.primaryRed, size: 20),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

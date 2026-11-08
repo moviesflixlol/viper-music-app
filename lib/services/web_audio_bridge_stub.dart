@@ -1,6 +1,16 @@
 class WebAudioBridge {
   static bool get isSupported => false;
-  static void playSong(String videoId) {}
+  static void playSong(
+    String videoId, {
+    String title = '',
+    String artist = '',
+    String thumbnailUrl = '',
+  }) {}
+  static void setMetadata({
+    String title = '',
+    String artist = '',
+    String thumbnailUrl = '',
+  }) {}
   static void pause() {}
   static void resume() {}
   static void seek(double seconds) {}

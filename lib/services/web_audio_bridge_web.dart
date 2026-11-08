@@ -1,7 +1,10 @@
 import 'dart:js_interop';
 
 @JS('viperPlaySong')
-external void _viperPlaySong(JSString videoId);
+external void _viperPlaySong(JSString videoId, JSString title, JSString artist, JSString thumbnailUrl);
+
+@JS('viperSetMediaMetadata')
+external void _viperSetMediaMetadata(JSString title, JSString artist, JSString thumbnailUrl);
 
 @JS('viperPause')
 external void _viperPause();
@@ -24,9 +27,24 @@ external JSNumber _viperGetState();
 class WebAudioBridge {
   static bool get isSupported => true;
 
-  static void playSong(String videoId) {
+  static void playSong(
+    String videoId, {
+    String title = '',
+    String artist = '',
+    String thumbnailUrl = '',
+  }) {
     try {
-      _viperPlaySong(videoId.toJS);
+      _viperPlaySong(videoId.toJS, title.toJS, artist.toJS, thumbnailUrl.toJS);
+    } catch (_) {}
+  }
+
+  static void setMetadata({
+    String title = '',
+    String artist = '',
+    String thumbnailUrl = '',
+  }) {
+    try {
+      _viperSetMediaMetadata(title.toJS, artist.toJS, thumbnailUrl.toJS);
     } catch (_) {}
   }
 

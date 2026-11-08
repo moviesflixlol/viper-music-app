@@ -31,7 +31,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     if (_pageController.hasClients && _pageController.page?.round() != widget.controller.selectedTabIndex) {
       _pageController.animateToPage(
         widget.controller.selectedTabIndex,
-        duration: const Duration(milliseconds: 260),
+        duration: const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
       );
     }
@@ -77,22 +77,22 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // 1. Swipeable Screens PageView
+          // 1. Swipeable Screens PageView (Enables full horizontal swipe turning between screens)
           PageView(
             controller: _pageController,
-            physics: const BouncingScrollPhysics(),
+            physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
             onPageChanged: (index) {
               controller.setTab(index);
             },
             children: screens,
           ),
 
-          // 2. Sticky Mini Player sitting directly above Floating Nav Bar
+          // 2. Floating Sticky Mini Player sitting directly above Floating Nav Bar
           if (currentSong != null)
             Positioned(
               left: 12,
               right: 12,
-              bottom: 84, // elevated so it doesn't overlap the floating capsule bar
+              bottom: 82,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: MiniPlayer(
@@ -107,11 +107,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ),
             ),
 
-          // 3. Floating Capsule Bottom Navigation Bar matching Screenshot
+          // 3. Floating Capsule Bottom Navigation Bar (Spotify + Netflix hybrid)
           Positioned(
-            left: 24,
-            right: 24,
-            bottom: 18,
+            left: 20,
+            right: 20,
+            bottom: 16,
             child: SafeArea(
               top: false,
               child: Center(
@@ -119,12 +119,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   height: 56,
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xE8181818), // Dark frosted acrylic
+                    color: const Color(0xF0181818),
                     borderRadius: BorderRadius.circular(28),
                     border: Border.all(color: Colors.white.withOpacity(0.12), width: 0.8),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.65),
+                        color: Colors.black.withOpacity(0.7),
                         blurRadius: 20,
                         offset: const Offset(0, 8),
                       ),
@@ -152,8 +152,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       const SizedBox(width: 4),
                       _buildNavItem(
                         index: 2,
-                        icon: Icons.queue_music_rounded,
-                        label: 'Playlists',
+                        icon: Icons.library_music_rounded,
+                        label: 'Library',
                         isActive: currentTab == 2,
                         onTap: () => controller.setTab(2),
                       ),

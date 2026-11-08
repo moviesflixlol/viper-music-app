@@ -4,6 +4,20 @@ import '../../state/music_controller.dart';
 import '../components/song_tile.dart';
 import '../components/add_to_playlist_sheet.dart';
 
+class SearchCategory {
+  final String title;
+  final Color color;
+  final String query;
+  final String imageUrl;
+
+  const SearchCategory({
+    required this.title,
+    required this.color,
+    required this.query,
+    required this.imageUrl,
+  });
+}
+
 class SearchScreen extends StatefulWidget {
   final MusicController controller;
 
@@ -16,15 +30,55 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchFieldController = TextEditingController();
 
-  final List<String> _quickTags = [
-    'Coldplay',
-    'Ed Sheeran',
-    'The Weeknd',
-    'Billie Eilish',
-    'Lofi Hip Hop',
-    'Synthwave',
-    'Rock Classics',
-    'Deep House',
+  static const List<SearchCategory> _browseCategories = [
+    SearchCategory(
+      title: 'Music',
+      color: Color(0xFFE91E63),
+      query: 'top songs',
+      imageUrl: 'https://i.scdn.co/image/ab67706f00000002b8d00938f38634812a321cfc',
+    ),
+    SearchCategory(
+      title: 'Podcasts',
+      color: Color(0xFF00796B),
+      query: 'podcast',
+      imageUrl: 'https://i.scdn.co/image/ab6765630000ba8aa2e2fb4209930773d328dd4c',
+    ),
+    SearchCategory(
+      title: 'Bollywood',
+      color: Color(0xFFC2185B),
+      query: 'bollywood hits',
+      imageUrl: 'https://i.scdn.co/image/ab67706f0000000201dc9ebc44122d256cd1b5b2',
+    ),
+    SearchCategory(
+      title: 'Home of I-Pop',
+      color: Color(0xFF1E3A8A),
+      query: 'indian pop',
+      imageUrl: 'https://i.scdn.co/image/ab67706f000000021c5756df6ad4720973a11681',
+    ),
+    SearchCategory(
+      title: 'Punjabi Hits',
+      color: Color(0xFFE65100),
+      query: 'punjabi hits',
+      imageUrl: 'https://i.scdn.co/image/ab67706f0000000234e4026ceb61c56598c114f6',
+    ),
+    SearchCategory(
+      title: 'Made For You',
+      color: Color(0xFF7E57C2),
+      query: 'viral hits',
+      imageUrl: 'https://i.scdn.co/image/ab67706f000000025f17101683935391e4dbfb3b',
+    ),
+    SearchCategory(
+      title: 'Hip-Hop',
+      color: Color(0xFF5D4037),
+      query: 'hip hop essentials',
+      imageUrl: 'https://i.ytimg.com/vi/H58vbez_m4E/hqdefault.jpg',
+    ),
+    SearchCategory(
+      title: 'Acoustic Chill',
+      color: Color(0xFF455A64),
+      query: 'acoustic chill',
+      imageUrl: 'https://i.ytimg.com/vi/2Vv-BfVoq4g/hqdefault.jpg',
+    ),
   ];
 
   @override
@@ -48,28 +102,72 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search Input Bar
+            // Top Bar matching Screenshot 1 (Avatar + Search Title + Camera)
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => controller.setTab(3),
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.primaryRed,
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'M',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  const Text(
+                    'Search',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.camera_alt_outlined, color: Colors.white70, size: 24),
+                ],
+              ),
+            ),
+
+            // White Spotify-Style Search Input Bar matching Screenshot 1
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Container(
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.border, width: 0.8),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: TextField(
                   controller: _searchFieldController,
-                  style: const TextStyle(color: Colors.white, fontSize: 15),
+                  style: const TextStyle(color: Colors.black, fontSize: 15, fontWeight: FontWeight.w500),
                   textInputAction: TextInputAction.search,
                   onSubmitted: (query) => controller.search(query),
                   decoration: InputDecoration(
-                    hintText: 'Search songs, artists, albums...',
-                    hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 22),
+                    hintText: 'What do you want to listen to?',
+                    hintStyle: const TextStyle(color: Color(0xFF757575), fontSize: 14, fontWeight: FontWeight.w500),
+                    prefixIcon: const Icon(Icons.search_rounded, color: Colors.black87, size: 24),
                     suffixIcon: _searchFieldController.text.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, color: AppColors.textSecondary, size: 18),
+                            icon: const Icon(Icons.clear_rounded, color: Colors.black54, size: 20),
                             onPressed: () {
                               _searchFieldController.clear();
                               controller.search('');
@@ -77,51 +175,14 @@ class _SearchScreenState extends State<SearchScreen> {
                           )
                         : null,
                     border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 13),
                   ),
                 ),
               ),
             ),
+            const SizedBox(height: 16),
 
-            // Quick Tags / Chips Carousel
-            SizedBox(
-              height: 38,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _quickTags.length,
-                itemBuilder: (context, index) {
-                  final tag = _quickTags[index];
-                  final isSelected = controller.currentQuery.toLowerCase() == tag.toLowerCase();
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(
-                        tag,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : AppColors.textSecondary,
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                        ),
-                      ),
-                      selected: isSelected,
-                      selectedColor: AppColors.primaryRed,
-                      backgroundColor: AppColors.surfaceElevated,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        side: BorderSide(
-                          color: isSelected ? AppColors.primaryRed : AppColors.border,
-                        ),
-                      ),
-                      onSelected: (_) => _executeSearch(tag),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Search Results or Empty State
+            // Content: Results OR Browse All Colorful Cards matching Screenshot 1
             Expanded(
               child: controller.isSearching
                   ? const Center(
@@ -129,11 +190,12 @@ class _SearchScreenState extends State<SearchScreen> {
                     )
                   : controller.searchResults.isNotEmpty
                       ? ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                           itemCount: controller.searchResults.length + 1,
                           itemBuilder: (context, index) {
                             if (index == controller.searchResults.length) {
                               return Padding(
-                                padding: const EdgeInsets.fromLTRB(24, 16, 24, 80),
+                                padding: const EdgeInsets.fromLTRB(24, 16, 24, 110),
                                 child: Center(
                                   child: controller.isLoadingMoreSearch
                                       ? const Padding(
@@ -166,13 +228,13 @@ class _SearchScreenState extends State<SearchScreen> {
                             final isCurrent = controller.player.currentSong?.id == song.id;
                             return SongTile(
                               song: song,
-                              isPlaying: controller.player.isPlaying,
+                              isPlaying: isCurrent && controller.player.isPlaying,
                               isCurrentTrack: isCurrent,
                               isDownloaded: controller.downloads.isDownloaded(song.id),
                               isDownloading: controller.downloads.isDownloading(song.id),
                               downloadProgress: controller.downloads.getDownloadProgress(song.id),
                               onTap: () {
-                                controller.playSongWithAuth(context, song, queueContext: controller.searchResults);
+                                controller.playSong(song, queueContext: controller.searchResults);
                               },
                               onDownload: () {
                                 controller.downloads.downloadSong(song);
@@ -184,7 +246,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             );
                           },
                         )
-                      : _buildEmptyState(),
+                      : _buildBrowseGrid(),
             ),
           ],
         ),
@@ -192,24 +254,94 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.music_note_rounded, size: 64, color: Colors.white.withOpacity(0.15)),
-          const SizedBox(height: 16),
-          Text(
-            'Discover Music on NextViper',
-            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16, fontWeight: FontWeight.w600),
+  Widget _buildBrowseGrid() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
+      children: [
+        const Text(
+          'Browse all',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Search any artist, song, album, or genre',
-            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
+        ),
+        const SizedBox(height: 12),
+
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.8,
           ),
-        ],
-      ),
+          itemCount: _browseCategories.length,
+          itemBuilder: (context, index) {
+            final cat = _browseCategories[index];
+            return GestureDetector(
+              onTap: () => _executeSearch(cat.query),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: cat.color,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  children: [
+                    // Title
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      right: 48,
+                      child: Text(
+                        cat.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+
+                    // Tilted Artwork Image in bottom right corner (exact Spotify style)
+                    Positioned(
+                      bottom: -8,
+                      right: -12,
+                      child: Transform.rotate(
+                        angle: 0.45,
+                        child: Container(
+                          width: 68,
+                          height: 68,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.4),
+                                blurRadius: 6,
+                                offset: const Offset(-2, 2),
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Image.network(
+                            cat.imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(color: Colors.black26),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

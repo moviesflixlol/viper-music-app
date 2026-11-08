@@ -101,7 +101,12 @@ class AudioPlayerService extends ChangeNotifier {
     try {
       // 1. Web Player Engine (uses YouTube Iframe audio bridge with 0 CORS & 0 bot blocks)
       if (kIsWeb && WebAudioBridge.isSupported) {
-        WebAudioBridge.playSong(song.id);
+        WebAudioBridge.playSong(
+          song.id,
+          title: song.title,
+          artist: song.artist,
+          thumbnailUrl: song.thumbnailUrl,
+        );
         _state = PlaybackState.playing;
         _startWebPositionTimer();
         notifyListeners();
@@ -137,7 +142,12 @@ class AudioPlayerService extends ChangeNotifier {
       } else {
         // Fallback to WebAudioBridge if available
         if (WebAudioBridge.isSupported) {
-          WebAudioBridge.playSong(song.id);
+          WebAudioBridge.playSong(
+            song.id,
+            title: song.title,
+            artist: song.artist,
+            thumbnailUrl: song.thumbnailUrl,
+          );
           _state = PlaybackState.playing;
           _startWebPositionTimer();
           notifyListeners();
