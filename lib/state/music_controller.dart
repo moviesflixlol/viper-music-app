@@ -233,9 +233,11 @@ class MusicController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setCategory(String cat) {
+  Future<void> setCategory(String cat) async {
+    if (_selectedCategory == cat) return;
     _selectedCategory = cat;
     notifyListeners();
+    await loadInitialFeed();
   }
 
   /// Play a song with background audio & media metadata
@@ -280,7 +282,10 @@ class MusicController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final feed = await apiService.getFeed(token: authService.token);
+      final feed = await apiService.getFeed(
+        token: authService.token,
+        category: _selectedCategory,
+      );
       _isBackendConnected = feed != null;
 
       if (feed != null) {
@@ -288,8 +293,13 @@ class MusicController extends ChangeNotifier {
         _feedRecommendations = feed.recommended;
         _trendingTracks = feed.trending;
       } else {
+        final query = _selectedCategory == 'Podcasts'
+            ? 'trending podcasts hindi'
+            : _selectedCategory == 'Artists'
+                ? 'top artist songs'
+                : 'trending bollywood music';
         final results = await Future.wait([
-          apiService.search('trending bollywood music').catchError((_) => <Song>[]),
+          apiService.search(query).catchError((_) => <Song>[]),
           apiService.search('top global hits').catchError((_) => <Song>[]),
           apiService.checkHealth().catchError((_) => false),
         ]);

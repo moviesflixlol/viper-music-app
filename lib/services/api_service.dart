@@ -47,12 +47,15 @@ class ApiService {
   }
 
   /// Fetch intelligent recommendation feed from NextViper
-  Future<FeedResult?> getFeed({String? token}) async {
+  Future<FeedResult?> getFeed({String? token, String? category}) async {
     try {
-      final uri = Uri.parse('$baseUrl${ApiConstants.feedEndpoint}');
+      final queryParam = category != null && category.isNotEmpty && category != 'All'
+          ? '?category=${Uri.encodeComponent(category)}'
+          : '';
+      final uri = Uri.parse('$baseUrl${ApiConstants.feedEndpoint}$queryParam');
       final response = await http
           .get(uri, headers: _buildHeaders(token: token))
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
