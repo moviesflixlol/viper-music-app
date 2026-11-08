@@ -13,12 +13,26 @@ class MusicController extends ChangeNotifier {
   List<Song> _feedRecommendations = [];
   List<Song> _trendingTracks = [];
   bool _isFeedLoading = false;
+  bool _isLoadingMoreFeed = false;
   bool _isBackendConnected = false;
+  int _feedPage = 0;
 
   // Search state
   List<Song> _searchResults = [];
   bool _isSearching = false;
+  bool _isLoadingMoreSearch = false;
   String _currentQuery = '';
+  int _searchPage = 0;
+
+  static const List<String> _feedQueries = [
+    'global top hits',
+    'viral pop 2026',
+    'hip hop essentials',
+    'electronic dance workout',
+    'acoustic chill vibes',
+    'rock legends',
+    'rnb slow jams',
+  ];
 
   MusicController({required this.apiService}) {
     player = AudioPlayerService(apiService: apiService);
@@ -38,10 +52,12 @@ class MusicController extends ChangeNotifier {
   List<Song> get feedRecommendations => _feedRecommendations;
   List<Song> get trendingTracks => _trendingTracks;
   bool get isFeedLoading => _isFeedLoading;
+  bool get isLoadingMoreFeed => _isLoadingMoreFeed;
   bool get isBackendConnected => _isBackendConnected;
 
   List<Song> get searchResults => _searchResults;
   bool get isSearching => _isSearching;
+  bool get isLoadingMoreSearch => _isLoadingMoreSearch;
   String get currentQuery => _currentQuery;
 
   void setTab(int index) {
@@ -51,6 +67,7 @@ class MusicController extends ChangeNotifier {
 
   Future<void> loadInitialFeed() async {
     _isFeedLoading = true;
+    _feedPage = 0;
     notifyListeners();
 
     try {
@@ -66,10 +83,10 @@ class MusicController extends ChangeNotifier {
       _isBackendConnected = results[2] as bool;
 
       if (trending.isNotEmpty) {
-        _trendingTracks = trending.take(10).toList();
+        _trendingTracks = trending.take(12).toList();
       }
       if (topPicks.isNotEmpty) {
-        _feedRecommendations = topPicks.take(15).toList();
+        _feedRecommendations = topPicks.take(20).toList();
       }
     } catch (_) {}
 
@@ -77,8 +94,33 @@ class MusicController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadMoreFeed() async {
+    if (_isLoadingMoreFeed) return;
+    _isLoadingMoreFeed = true;
+    notifyListeners();
+
+    try {
+      final query = _feedQueries[_feedPage % _feedQueries.length];
+      _feedPage++;
+
+      final moreSongs = await apiService.search(query);
+      if (moreSongs.isNotEmpty) {
+        final existingIds = _feedRecommendations.map((s) => s.id).toSet();
+        final newUnique = moreSongs.where((s) => !existingIds.contains(s.id)).toList();
+
+        if (newUnique.isNotEmpty) {
+          _feedRecommendations = [..._feedRecommendations, ...newUnique];
+        }
+      }
+    } catch (_) {}
+
+    _isLoadingMoreFeed = false;
+    notifyListeners();
+  }
+
   Future<void> search(String query) async {
     _currentQuery = query;
+    _searchPage = 0;
     if (query.trim().isEmpty) {
       _searchResults = [];
       _isSearching = false;
@@ -92,6 +134,32 @@ class MusicController extends ChangeNotifier {
     final results = await apiService.search(query);
     _searchResults = results;
     _isSearching = false;
+    notifyListeners();
+  }
+
+  Future<void> loadMoreSearch() async {
+    if (_isLoadingMoreSearch || _currentQuery.trim().isEmpty) return;
+    _isLoadingMoreSearch = true;
+    notifyListeners();
+
+    try {
+      _searchPage++;
+      final suffixes = ['official audio', 'remix', 'live', 'album'];
+      final suffix = suffixes[_searchPage % suffixes.length];
+      final moreQuery = '$_currentQuery $suffix';
+
+      final moreResults = await apiService.search(moreQuery);
+      if (moreResults.isNotEmpty) {
+        final existingIds = _searchResults.map((s) => s.id).toSet();
+        final newUnique = moreResults.where((s) => !existingIds.contains(s.id)).toList();
+
+        if (newUnique.isNotEmpty) {
+          _searchResults = [..._searchResults, ...newUnique];
+        }
+      }
+    } catch (_) {}
+
+    _isLoadingMoreSearch = false;
     notifyListeners();
   }
 

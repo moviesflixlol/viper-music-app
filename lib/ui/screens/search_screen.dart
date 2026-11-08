@@ -128,8 +128,40 @@ class _SearchScreenState extends State<SearchScreen> {
                     )
                   : controller.searchResults.isNotEmpty
                       ? ListView.builder(
-                          itemCount: controller.searchResults.length,
+                          itemCount: controller.searchResults.length + 1,
                           itemBuilder: (context, index) {
+                            // Bottom "Load More Results" item
+                            if (index == controller.searchResults.length) {
+                              return Padding(
+                                padding: const EdgeInsets.fromLTRB(24, 16, 24, 80),
+                                child: Center(
+                                  child: controller.isLoadingMoreSearch
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(12),
+                                          child: CircularProgressIndicator(color: AppColors.primaryRed),
+                                        )
+                                      : OutlinedButton.icon(
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: Colors.white,
+                                            side: const BorderSide(color: AppColors.primaryRed, width: 1.5),
+                                            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                          ),
+                                          icon: const Icon(Icons.add_rounded, color: AppColors.primaryRed),
+                                          label: const Text(
+                                            'LOAD MORE RESULTS',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 1.2,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                          onPressed: controller.loadMoreSearch,
+                                        ),
+                                ),
+                              );
+                            }
+
                             final song = controller.searchResults[index];
                             final isCurrent = controller.player.currentSong?.id == song.id;
                             return SongTile(

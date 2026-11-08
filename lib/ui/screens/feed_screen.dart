@@ -33,7 +33,7 @@ class FeedScreen extends StatelessWidget {
       onRefresh: controller.loadInitialFeed,
       child: CustomScrollView(
         slivers: [
-          // Netflix App Bar
+          // Netflix App Bar with Custom Logo
           SliverAppBar(
             backgroundColor: AppColors.background.withOpacity(0.9),
             floating: true,
@@ -41,24 +41,21 @@ class FeedScreen extends StatelessWidget {
             elevation: 0,
             title: Row(
               children: [
-                // Netflix 'N' style Icon
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryRed,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'NV',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
-                      letterSpacing: 1.0,
+                // Custom Header Logo
+                Image.asset(
+                  'assets/images/header_logo.png',
+                  height: 34,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryRed,
+                      borderRadius: BorderRadius.circular(4),
                     ),
+                    child: const Text('M', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 const Text(
                   'MUSIC',
                   style: TextStyle(
@@ -160,6 +157,38 @@ class FeedScreen extends StatelessWidget {
                 );
               },
               childCount: controller.feedRecommendations.length,
+            ),
+          ),
+
+          // Load More Music Button
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Center(
+                child: controller.isLoadingMoreFeed
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: CircularProgressIndicator(color: AppColors.primaryRed),
+                      )
+                    : OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: AppColors.primaryRed, width: 1.5),
+                          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        ),
+                        icon: const Icon(Icons.add_rounded, color: AppColors.primaryRed),
+                        label: const Text(
+                          'LOAD MORE MUSIC',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                            fontSize: 13,
+                          ),
+                        ),
+                        onPressed: controller.loadMoreFeed,
+                      ),
+              ),
             ),
           ),
 
