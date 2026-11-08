@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -7,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/download_item.dart';
 import '../models/song.dart';
 import 'api_service.dart';
+import 'file_helper.dart';
 
 class DownloadService extends ChangeNotifier {
   static const String _prefsKey = 'viper_downloaded_songs';
@@ -42,7 +42,7 @@ class DownloadService extends ChangeNotifier {
       final jsonList = prefs.getStringList(_prefsKey) ?? [];
       _downloadedSongs = jsonList
           .map((item) => Song.fromJson(jsonDecode(item) as Map<String, dynamic>))
-          .where((s) => s.localFilePath != null && File(s.localFilePath!).existsSync())
+          .where((s) => kIsWeb || (s.localFilePath != null && checkFileExists(s.localFilePath!)))
           .toList();
       notifyListeners();
     } catch (_) {}
@@ -78,32 +78,34 @@ class DownloadService extends ChangeNotifier {
         throw Exception("Could not resolve stream URL for offline download");
       }
 
-      // 2. Prepare local storage destination
-      final appDir = await getApplicationDocumentsDirectory();
-      final downloadsDir = Directory('${appDir.path}/offline_music');
-      if (!downloadsDir.existsSync()) {
-        downloadsDir.createSync(recursive: true);
+      String? targetPath;
+
+      if (!kIsWeb) {
+        // 2. Prepare local storage destination on mobile / desktop
+        final appDir = await getApplicationDocumentsDirectory();
+        final sanitizedId = song.id.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+        targetPath = '${appDir.path}/$sanitizedId.m4a';
+
+        // 3. Download with progress callbacks
+        await _dio.download(
+          streamUrl,
+          targetPath,
+          onReceiveProgress: (received, total) {
+            if (total > 0) {
+              final progress = (received / total).clamp(0.0, 1.0);
+              _activeDownloads[song.id] = _activeDownloads[song.id]!.copyWith(
+                progress: progress,
+                downloadedBytes: received,
+                totalBytes: total,
+              );
+              notifyListeners();
+            }
+          },
+        );
+      } else {
+        // On web, simulate save to offline library
+        targetPath = streamUrl;
       }
-
-      final sanitizedId = song.id.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-      final targetPath = '${downloadsDir.path}/$sanitizedId.m4a';
-
-      // 3. Download with progress callbacks
-      await _dio.download(
-        streamUrl,
-        targetPath,
-        onReceiveProgress: (received, total) {
-          if (total > 0) {
-            final progress = (received / total).clamp(0.0, 1.0);
-            _activeDownloads[song.id] = _activeDownloads[song.id]!.copyWith(
-              progress: progress,
-              downloadedBytes: received,
-              totalBytes: total,
-            );
-            notifyListeners();
-          }
-        },
-      );
 
       // 4. Record as successfully downloaded
       final downloadedSong = song.copyWith(
@@ -122,7 +124,6 @@ class DownloadService extends ChangeNotifier {
       );
       notifyListeners();
 
-      // Clear from active after a short delay
       Future.delayed(const Duration(seconds: 2), () {
         _activeDownloads.remove(song.id);
         notifyListeners();
@@ -141,13 +142,8 @@ class DownloadService extends ChangeNotifier {
     final index = _downloadedSongs.indexWhere((s) => s.id == songId);
     if (index != -1) {
       final song = _downloadedSongs[index];
-      if (song.localFilePath != null) {
-        final file = File(song.localFilePath!);
-        if (file.existsSync()) {
-          try {
-            file.deleteSync();
-          } catch (_) {}
-        }
+      if (song.localFilePath != null && !kIsWeb) {
+        deleteLocalFile(song.localFilePath!);
       }
       _downloadedSongs.removeAt(index);
       await _saveDownloadedSongs();

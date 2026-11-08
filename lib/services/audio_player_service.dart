@@ -1,9 +1,9 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 import '../models/song.dart';
 import 'api_service.dart';
+import 'file_helper.dart';
 
 enum PlaybackState { idle, loading, playing, paused, completed, error }
 enum RepeatMode { off, all, one }
@@ -36,8 +36,12 @@ class AudioPlayerService extends ChangeNotifier {
   bool get isPlaying => _state == PlaybackState.playing;
 
   Future<void> _initAudio() async {
-    final session = await AudioSession.instance;
-    await session.configure(const AudioSessionConfiguration.music());
+    if (!kIsWeb) {
+      try {
+        final session = await AudioSession.instance;
+        await session.configure(const AudioSessionConfiguration.music());
+      } catch (_) {}
+    }
 
     _player.playerStateStream.listen((playerState) {
       if (playerState.processingState == ProcessingState.loading ||
@@ -88,11 +92,14 @@ class AudioPlayerService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. If song is downloaded, play directly from local file
-      if (song.isDownloaded && song.localFilePath != null && File(song.localFilePath!).existsSync()) {
-        await _player.setAudioSource(AudioSource.file(song.localFilePath!));
-        await _player.play();
-        return;
+      // 1. If song is downloaded and on native, play directly from local file
+      if (!kIsWeb && song.isDownloaded && song.localFilePath != null && checkFileExists(song.localFilePath!)) {
+        final source = getAudioSourceForFile(song.localFilePath!);
+        if (source != null) {
+          await _player.setAudioSource(source);
+          await _player.play();
+          return;
+        }
       }
 
       // 2. Otherwise resolve stream URL from NextViper backend

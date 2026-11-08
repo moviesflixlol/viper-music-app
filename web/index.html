@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Viper Music - Clean, Minimal Netflix-themed Music Player">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Viper Music">
+  <meta name="theme-color" content="#E50914">
+
+  <title>Viper Music</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    body {
+      background-color: #000000;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .loading-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .logo {
+      color: #E50914;
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      margin-bottom: 24px;
+      text-transform: uppercase;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(229, 9, 20, 0.2);
+      border-top-color: #E50914;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="loading-container" id="loading">
+    <div class="logo">VIPER MUSIC</div>
+    <div class="spinner"></div>
+  </div>
+
+  <script src="flutter.js" defer></script>
+  <script>
+    window.addEventListener('load', function(ev) {
+      // Download main.dart.js
+      _flutter.loader.loadEntrypoint({
+        serviceWorker: {
+          serviceWorkerVersion: {{flutter_service_worker_version}},
+        },
+        onEntrypointLoaded: function(engineInitializer) {
+          engineInitializer.initializeEngine().then(function(appRunner) {
+            var loader = document.getElementById('loading');
+            if (loader) loader.remove();
+            appRunner.runApp();
+          });
+        }
+      });
+    });
+  </script>
+</body>
+</html>
