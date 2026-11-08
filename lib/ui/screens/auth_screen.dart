@@ -135,6 +135,17 @@ class _AuthScreenState extends State<AuthScreen> {
 
     if (!mounted) return;
     if (res['success'] == true) {
+      if (res['verificationRequired'] == false) {
+        // Daily quota limit fallback: direct sign up without requiring OTP!
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created! Welcome to MUSIC.'),
+            backgroundColor: AppColors.primaryRed,
+          ),
+        );
+        Navigator.of(context).pop(true);
+        return;
+      }
       setState(() {
         _mode = AuthScreenMode.signUpVerifyOtp;
         _successMessage = 'A 6-digit verification code was sent to ${_emailController.text.trim()}';
@@ -192,7 +203,14 @@ class _AuthScreenState extends State<AuthScreen> {
       });
       _startResendTimer();
     } else {
-      setState(() => _errorMessage = res['error'] as String? ?? 'Failed to send reset code');
+      final err = res['error'] as String? ?? '';
+      if (err.toLowerCase().contains('quota') ||
+          err.toLowerCase().contains('daily limit') ||
+          err.contains('429')) {
+        setState(() => _errorMessage = 'Email service daily limit reached. Please try again later or contact support.');
+      } else {
+        setState(() => _errorMessage = err.isNotEmpty ? err : 'Failed to send reset code');
+      }
     }
   }
 

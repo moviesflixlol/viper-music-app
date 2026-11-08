@@ -22,6 +22,7 @@ void main() async {
   );
 
   final apiService = ApiService();
+  await apiService.initialize();
   final authService = AuthService(apiService: apiService);
   await authService.initialize();
 

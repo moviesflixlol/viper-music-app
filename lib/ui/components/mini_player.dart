@@ -10,6 +10,7 @@ class MiniPlayer extends StatelessWidget {
   final Duration duration;
   final VoidCallback onTogglePlay;
   final VoidCallback onNext;
+  final VoidCallback? onClose;
   final VoidCallback onTap;
 
   const MiniPlayer({
@@ -20,6 +21,7 @@ class MiniPlayer extends StatelessWidget {
     required this.duration,
     required this.onTogglePlay,
     required this.onNext,
+    this.onClose,
     required this.onTap,
   });
 
@@ -148,6 +150,18 @@ class MiniPlayer extends StatelessWidget {
                     ),
                     onPressed: onNext,
                   ),
+
+                  // Close (Cross) Button
+                  if (onClose != null)
+                    IconButton(
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: AppColors.textSecondary,
+                        size: 20,
+                      ),
+                      tooltip: 'Close player',
+                      onPressed: onClose,
+                    ),
                 ],
               ),
             ),

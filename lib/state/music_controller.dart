@@ -449,9 +449,26 @@ class MusicController extends ChangeNotifier {
     try {
       final remote = await apiService.getPlaylists(token: authService.token);
       if (remote.isNotEmpty) {
-        final existingIds = _userPlaylists.map((p) => p.id).toSet();
+        // Merge remote with local without losing playlists or tracks
         for (final r in remote) {
-          if (!existingIds.contains(r.id) && r.name.trim().isNotEmpty) {
+          final idx = _userPlaylists.indexWhere(
+            (p) => p.id == r.id || (p.name.toLowerCase() == r.name.toLowerCase() && r.name.trim().isNotEmpty),
+          );
+          if (idx != -1) {
+            final localPl = _userPlaylists[idx];
+            final trackIds = localPl.tracks.map((t) => t.id).toSet();
+            final mergedTracks = [...localPl.tracks];
+            for (final rt in r.tracks) {
+              if (!trackIds.contains(rt.id)) {
+                mergedTracks.add(rt);
+              }
+            }
+            _userPlaylists[idx] = r.copyWith(
+              id: localPl.id,
+              tracks: mergedTracks,
+              coverUrl: mergedTracks.isNotEmpty ? mergedTracks.first.thumbnailUrl : r.coverUrl,
+            );
+          } else if (r.name.trim().isNotEmpty) {
             _userPlaylists.add(r);
           }
         }
@@ -485,12 +502,26 @@ class MusicController extends ChangeNotifier {
     await _saveLocalPlaylists();
     notifyListeners();
 
-    // 2. Sync with cloud backend in background
+    // 2. Sync with cloud backend in background with exact ID
     apiService.createPlaylist(
+      id: newPlaylist.id,
       name: trimmedName,
       description: description,
       token: authService.token,
-    ).catchError((_) => null);
+    ).then((remotePl) {
+      if (remotePl != null) {
+        final idx = _userPlaylists.indexWhere((p) => p.id == newPlaylist.id || p.name == trimmedName);
+        if (idx != -1) {
+          final localTracks = _userPlaylists[idx].tracks;
+          _userPlaylists[idx] = remotePl.copyWith(
+            id: newPlaylist.id,
+            tracks: localTracks.isNotEmpty ? localTracks : remotePl.tracks,
+          );
+          _saveLocalPlaylists();
+          notifyListeners();
+        }
+      }
+    }).catchError((_) => null);
 
     return true;
   }

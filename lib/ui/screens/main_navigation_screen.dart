@@ -102,6 +102,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   duration: player.duration,
                   onTogglePlay: player.togglePlayPause,
                   onNext: controller.skipNextWithTelemetry,
+                  onClose: () => controller.player.stop(),
                   onTap: () => _openFullPlayer(context),
                 ),
               ),

@@ -21,6 +21,7 @@ class ArtistDetailScreen extends StatefulWidget {
 
 class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   List<Song> _tracks = [];
+  List<Song> _podcasts = [];
   bool _isLoading = true;
   bool _isFollowing = false;
   String? _errorMessage;
@@ -38,11 +39,13 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
     });
 
     try {
-      final query = '${widget.artist.name} top songs';
-      final results = await widget.controller.apiService.search(query);
+      final tracksFuture = widget.controller.apiService.search('${widget.artist.name} songs');
+      final podFuture = widget.controller.apiService.search('${widget.artist.name} podcast');
+      final res = await Future.wait([tracksFuture, podFuture]);
       if (mounted) {
         setState(() {
-          _tracks = results;
+          _tracks = res[0];
+          _podcasts = res[1];
           _isLoading = false;
         });
       }
@@ -276,6 +279,49 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                 childCount: _tracks.length,
               ),
             ),
+
+          // 5. Podcasts & Interviews Section (Real YouTube streams, No Mock)
+          if (_podcasts.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 28, 16, 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.podcasts, color: AppColors.primaryRed, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Podcasts & Interviews',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final pod = _podcasts[index];
+                  final isCurrent = controller.player.currentSong?.id == pod.id;
+
+                  return SongTile(
+                    song: pod,
+                    isPlaying: isCurrent && controller.player.isPlaying,
+                    isCurrentTrack: isCurrent,
+                    onTap: () => controller.playSong(pod, queueContext: _podcasts),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.playlist_add, color: Colors.white60, size: 22),
+                      onPressed: () => AddToPlaylistSheet.show(context, controller, pod),
+                    ),
+                  );
+                },
+                childCount: _podcasts.length,
+              ),
+            ),
+          ],
 
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],

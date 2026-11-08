@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_constants.dart';
 import '../models/song.dart';
 import '../models/playlist.dart';
@@ -46,13 +48,30 @@ class FeedResult {
 
 class ApiService {
   String baseUrl;
+  String? _deviceId;
+  String get deviceId => _deviceId ?? 'dev_guest';
 
   ApiService({this.baseUrl = ApiConstants.defaultBaseUrl});
+
+  Future<void> initialize() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _deviceId = prefs.getString('device_session_id');
+      if (_deviceId == null || _deviceId!.isEmpty) {
+        _deviceId = 'dev_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(999999)}';
+        await prefs.setString('device_session_id', _deviceId!);
+      }
+    } catch (_) {
+      _deviceId ??= 'dev_session_${DateTime.now().millisecondsSinceEpoch}';
+    }
+  }
 
   Map<String, String> _buildHeaders({String? token}) {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'x-device-id': deviceId,
+      'x-session-id': deviceId,
     };
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
@@ -241,7 +260,7 @@ class ApiService {
         final token = data['token'] as String? ?? '';
         final userJson = data['user'] as Map<String, dynamic>? ?? {};
         final user = UserModel.fromJson(userJson, token: token);
-        return {'success': true, 'user': user, 'token': token};
+        return {'success': true, 'verificationRequired': false, 'user': user, 'token': token};
       }
       return {'success': false, 'error': data['error'] ?? 'Registration failed'};
     } catch (e) {
@@ -266,7 +285,7 @@ class ApiService {
         final token = data['token'] as String? ?? '';
         final userJson = data['user'] as Map<String, dynamic>? ?? {};
         final user = UserModel.fromJson(userJson, token: token);
-        return {'success': true, 'user': user, 'token': token};
+        return {'success': true, 'verificationRequired': false, 'user': user, 'token': token};
       }
       return {'success': false, 'error': data['error'] ?? 'Verification failed'};
     } catch (e) {
@@ -355,7 +374,7 @@ class ApiService {
         final token = data['token'] as String? ?? '';
         final userJson = data['user'] as Map<String, dynamic>? ?? {};
         final user = UserModel.fromJson(userJson, token: token);
-        return {'success': true, 'user': user, 'token': token};
+        return {'success': true, 'verificationRequired': false, 'user': user, 'token': token};
       }
       return {'success': false, 'error': data['error'] ?? 'Invalid credentials'};
     } catch (e) {
@@ -405,6 +424,7 @@ class ApiService {
   }
 
   Future<Playlist?> createPlaylist({
+    String? id,
     required String name,
     String description = '',
     String coverUrl = '',
@@ -412,17 +432,21 @@ class ApiService {
   }) async {
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.playlistsEndpoint}');
+      final bodyMap = <String, dynamic>{
+        'name': name,
+        'description': description,
+        'coverUrl': coverUrl,
+      };
+      if (id != null && id.isNotEmpty) {
+        bodyMap['id'] = id;
+      }
       final response = await http.post(
         uri,
         headers: _buildHeaders(token: token),
-        body: jsonEncode({
-          'name': name,
-          'description': description,
-          'coverUrl': coverUrl,
-        }),
+        body: jsonEncode(bodyMap),
       ).timeout(const Duration(seconds: 6));
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         return Playlist.fromJson(data);
       }

@@ -61,7 +61,7 @@ class AuthService extends ChangeNotifier {
       await prefs.setString(_keyUser, jsonEncode(_currentUser!.toJson()));
 
       notifyListeners();
-      return {'success': true};
+      return {'success': true, 'verificationRequired': false};
     } else {
       notifyListeners();
       return {'success': false, 'error': result['error'] ?? 'Login failed'};
@@ -103,7 +103,7 @@ class AuthService extends ChangeNotifier {
       await prefs.setString(_keyUser, jsonEncode(_currentUser!.toJson()));
 
       notifyListeners();
-      return {'success': true};
+      return {'success': true, 'verificationRequired': false};
     } else {
       notifyListeners();
       return {'success': false, 'error': result['error'] ?? 'Registration failed'};
@@ -129,7 +129,7 @@ class AuthService extends ChangeNotifier {
       await prefs.setString(_keyUser, jsonEncode(_currentUser!.toJson()));
 
       notifyListeners();
-      return {'success': true};
+      return {'success': true, 'verificationRequired': false};
     } else {
       notifyListeners();
       return {'success': false, 'error': result['error'] ?? 'Verification failed'};
