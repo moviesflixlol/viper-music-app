@@ -23,7 +23,7 @@ class ApiService {
   Future<List<Song>> search(String query) async {
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.searchEndpoint}?q=${Uri.encodeComponent(query)}');
-      final response = await http.get(uri).timeout(const Duration(seconds: 12));
+      final response = await http.get(uri).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;

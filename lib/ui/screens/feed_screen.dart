@@ -68,6 +68,26 @@ class FeedScreen extends StatelessWidget {
                     letterSpacing: 2.0,
                   ),
                 ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: controller.isBackendConnected ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: controller.isBackendConnected ? Colors.green : Colors.orange,
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Text(
+                    controller.isBackendConnected ? 'AWS LIVE' : 'CONNECTING',
+                    style: TextStyle(
+                      color: controller.isBackendConnected ? Colors.greenAccent : Colors.orangeAccent,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ],
             ),
             actions: [
@@ -265,7 +285,7 @@ class FeedScreen extends StatelessWidget {
               controller: textController,
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(
-                hintText: 'http://10.0.2.2:8080',
+                hintText: 'https://34-232-210-74.sslip.io',
                 hintStyle: TextStyle(color: AppColors.textMuted),
                 enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
                 focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryRed)),

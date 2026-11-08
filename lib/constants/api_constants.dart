@@ -1,9 +1,11 @@
 class ApiConstants {
   ApiConstants._();
 
-  /// Default URL for NextViper music backend
-  /// For Android emulator use 10.0.2.2, for real devices use your LAN or AWS server IP.
-  static const String defaultBaseUrl = 'http://10.0.2.2:8080';
+  /// Default live NextViper music backend deployed on AWS EC2
+  /// Supports both HTTPS (via Let's Encrypt / sslip.io) for web browsers and HTTP for mobile.
+  static const String defaultBaseUrl = 'https://34-232-210-74.sslip.io';
+  static const String directHttpUrl = 'http://34.232.210.74:8080';
+  static const String emulatorUrl = 'http://10.0.2.2:8080';
 
   static const String healthEndpoint = '/health';
   static const String searchEndpoint = '/api/search';
