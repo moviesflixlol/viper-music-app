@@ -51,13 +51,11 @@ class MusicController extends ChangeNotifier {
   String _currentQuery = '';
   int _searchPage = 0;
 
-  // Real Spotify-style Category Filter Chips (from Screenshot 2, 3, 5)
+  // Categories — no Podcasts, no Artists (those were mock)
   static const List<String> categories = [
     'All',
     'Music',
-    'Podcasts',
     'Charts',
-    'Artists',
   ];
 
   static const List<String> _feedQueries = [
