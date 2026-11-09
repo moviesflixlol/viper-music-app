@@ -36,6 +36,8 @@ class MusicController extends ChangeNotifier {
   List<Playlist> _userPlaylists = [];
   List<ArtistInfo> _popularArtists = [];
 
+  List<Playlist> _serverMixes = [];   // Personalized mixes from backend
+  List<String> _userInterests = [];   // Interest genres returned by server feed
   bool _isFeedLoading = false;
   bool _isLoadingMoreFeed = false;
   bool _isPlaylistsLoading = false;
@@ -260,7 +262,8 @@ class MusicController extends ChangeNotifier {
   List<Song> get feedRecommendations => _feedRecommendations;
   List<Song> get trendingTracks => _trendingTracks;
   List<Playlist> get userPlaylists => _userPlaylists;
-  List<Playlist> get recommendedMixes => curatedPlaylists;
+  List<Playlist> get recommendedMixes =>
+      _serverMixes.isNotEmpty ? _serverMixes : curatedPlaylists;
 
   bool get isFeedLoading => _isFeedLoading;
   bool get isLoadingMoreFeed => _isLoadingMoreFeed;
@@ -337,6 +340,16 @@ class MusicController extends ChangeNotifier {
         _feedRecommendations = feed.recommended;
         _trendingTracks = feed.trending;
 
+        // Store personalized mixes from server — these are per-user, not static
+        if (feed.mixes.isNotEmpty) {
+          _serverMixes = feed.mixes;
+        }
+
+        // Store user's interest genres for smarter loadMoreFeed queries
+        if (feed.userInterests.isNotEmpty) {
+          _userInterests = feed.userInterests;
+        }
+
         // Dynamic artists update: blend server-provided feed artists with rotating pool
         final dynamicList = feed.artists.map((a) => ArtistInfo(
           name: a.name,
@@ -391,7 +404,12 @@ class MusicController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final query = _feedQueries[_feedPage % _feedQueries.length];
+      // Use user's interest genres when available, fall back to generic queries
+      final effectiveQueries = _userInterests.isNotEmpty
+          ? _userInterests.map((g) => '$g hits 2026').toList()
+          : _feedQueries;
+
+      final query = effectiveQueries[_feedPage % effectiveQueries.length];
       _feedPage++;
 
       final moreSongs = await apiService.search(query);

@@ -48,7 +48,7 @@ class FeedScreen extends StatelessWidget {
 
     final startListening = controller.trendingTracks.take(4).toList();
     final recommended = controller.feedRecommendations;
-    final charts = MusicController.curatedPlaylists;
+    final charts = controller.recommendedMixes;
     final artists = controller.popularArtists;
     final isPodcasts = controller.selectedCategory == 'Podcasts';
     final isMusic = controller.selectedCategory == 'Music';
@@ -191,9 +191,11 @@ class FeedScreen extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Charts',
-                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                    Text(
+                      controller.recommendedMixes == MusicController.curatedPlaylists
+                          ? 'Charts'
+                          : 'Your Mixes',
+                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
                     ),
                     GestureDetector(
                       onTap: () => controller.setTab(2),

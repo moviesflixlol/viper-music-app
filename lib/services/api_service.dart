@@ -35,6 +35,7 @@ class FeedResult {
   final List<Song> trending;
   final List<ArtistItem> artists;
   final String country;
+  final List<String> userInterests;
 
   FeedResult({
     required this.featured,
@@ -43,6 +44,7 @@ class FeedResult {
     required this.trending,
     this.artists = const [],
     this.country = 'IN',
+    this.userInterests = const [],
   });
 }
 
@@ -138,6 +140,10 @@ class ApiService {
             .map((e) => ArtistItem.fromJson(e))
             .toList();
 
+        final userInterests = (data['userInterests'] as List<dynamic>? ?? [])
+            .whereType<String>()
+            .toList();
+
         return FeedResult(
           featured: featuredSong,
           recommended: recList,
@@ -145,6 +151,7 @@ class ApiService {
           trending: trendList,
           artists: artistList,
           country: data['country'] as String? ?? detectedCountry,
+          userInterests: userInterests,
         );
       }
       return null;
