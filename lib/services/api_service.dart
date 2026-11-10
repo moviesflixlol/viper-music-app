@@ -389,7 +389,10 @@ class ApiService {
     }
   }
 
-  Future<UserModel?> getMe(String token) async {
+  Future<UserModel?> getMe(
+    String token, {
+    Future<void> Function()? onUnauthorized,
+  }) async {
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.meEndpoint}');
       final response = await http
@@ -400,6 +403,9 @@ class ApiService {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final userJson = data['user'] as Map<String, dynamic>? ?? {};
         return UserModel.fromJson(userJson, token: token);
+      }
+      if (response.statusCode == 401) {
+        await onUnauthorized?.call();
       }
       return null;
     } catch (_) {

@@ -31,7 +31,11 @@ class AuthService extends ChangeNotifier {
         _currentUser = UserModel.fromJson(userMap, token: _token!);
 
         // Background verify with server
-        _apiService.getMe(_token!).then((verifiedUser) {
+        final restoredToken = _token!;
+        _apiService.getMe(restoredToken, onUnauthorized: () async {
+          if (_token == restoredToken) await logout();
+        }).then((verifiedUser) {
+          if (_token != restoredToken) return;
           if (verifiedUser != null) {
             _currentUser = verifiedUser;
             notifyListeners();
