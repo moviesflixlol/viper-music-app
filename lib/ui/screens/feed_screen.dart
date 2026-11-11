@@ -25,9 +25,7 @@ class FeedScreen extends StatelessWidget {
                       backgroundColor: Colors.black,
                       pinned: true,
                       titleSpacing: 16,
-                      title: const Text('Music',
-                          style: TextStyle(
-                              fontSize: 26, fontWeight: FontWeight.w800)),
+                      title: Image.asset('assets/images/movieflix_header.png', height: 36, width: 145, fit: BoxFit.contain, semanticLabel: 'MovieFlix'),
                       actions: [
                         IconButton(
                             tooltip: 'Search songs and artists',
