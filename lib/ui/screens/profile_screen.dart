@@ -1,3 +1,4 @@
+import 'pro_screen.dart';
 import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
 import '../../state/music_controller.dart';
@@ -81,7 +82,7 @@ class ProfileScreen extends StatelessWidget {
                           border: Border.all(color: AppColors.primaryRed, width: 0.6),
                         ),
                         child: Text(
-                          isLoggedIn ? 'VIP STREAMER' : 'FREE TIER',
+                          isLoggedIn ? 'MEMBER' : 'FREE TIER',
                           style: const TextStyle(color: AppColors.primaryRed, fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -117,6 +118,11 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
 
+          ListTile(leading: const Icon(Icons.workspace_premium),title: const Text('Music Pro'),
+            subtitle: const Text('Plans and promo redemption · Annual includes MovieFlix'),
+            trailing: const Icon(Icons.chevron_right),onTap:()=>Navigator.of(context).push(MaterialPageRoute(
+              builder:(_)=>ProScreen(controller:controller)))),
+          const SizedBox(height:16),
           // User Statistics Card
           Container(
             padding: const EdgeInsets.all(16),

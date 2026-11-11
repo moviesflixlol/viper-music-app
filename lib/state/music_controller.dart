@@ -92,6 +92,7 @@ class MusicController extends ChangeNotifier {
     required this.authService,
   }) {
     player = AudioPlayerService(apiService: apiService);
+    player.sessionToken = () => authService.token;
     downloads = DownloadService(apiService: apiService);
 
     player.addListener(_onPlaybackChanged);

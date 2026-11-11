@@ -6,6 +6,7 @@ import '../models/song.dart';
 import 'api_service.dart';
 import 'file_helper.dart';
 import 'web_audio_bridge.dart';
+import 'preroll.dart';
 
 enum PlaybackState { idle, loading, playing, paused, completed, error }
 
@@ -15,6 +16,7 @@ class AudioPlayerService extends ChangeNotifier {
   final ApiService apiService;
   final AudioPlayer _player = AudioPlayer();
   Timer? _webPositionTimer;
+  String? Function()? sessionToken;
 
   int playbackSession = 0;
   Song? _currentSong;
@@ -95,13 +97,17 @@ class AudioPlayerService extends ChangeNotifier {
   }
 
   Future<void> _loadAndPlay(Song song) async {
-    playbackSession++;
+    final generation = ++playbackSession;
+    _webPositionTimer?.cancel();
+    WebAudioBridge.pause();
     _currentSong = song;
     _state = PlaybackState.loading;
     _position = Duration.zero;
     notifyListeners();
 
     try {
+      if (kIsWeb) await musicPreroll(sessionToken?.call());
+      if (generation != playbackSession) return;
       // 1. Web Player Engine (uses YouTube Iframe audio bridge with 0 CORS & 0 bot blocks)
       if (kIsWeb && WebAudioBridge.isSupported) {
         WebAudioBridge.playSong(
@@ -201,6 +207,7 @@ class AudioPlayerService extends ChangeNotifier {
   }
 
   Future<void> resume() async {
+    if (_state == PlaybackState.loading) return;
     if (kIsWeb && WebAudioBridge.isSupported) {
       WebAudioBridge.resume();
       _state = PlaybackState.playing;
@@ -211,6 +218,7 @@ class AudioPlayerService extends ChangeNotifier {
   }
 
   Future<void> pause() async {
+    if (_state == PlaybackState.loading) return;
     if (kIsWeb && WebAudioBridge.isSupported) {
       WebAudioBridge.pause();
       _state = PlaybackState.paused;
@@ -221,6 +229,9 @@ class AudioPlayerService extends ChangeNotifier {
   }
 
   Future<void> stop() async {
+    playbackSession++;
+    cancelPreroll();
+    _webPositionTimer?.cancel();
     if (kIsWeb && WebAudioBridge.isSupported) {
       WebAudioBridge.pause();
     } else {
@@ -297,7 +308,8 @@ class AudioPlayerService extends ChangeNotifier {
 
   void _onTrackCompleted() {
     if (_repeatMode == PlayerRepeatMode.one) {
-      seek(Duration.zero).then((_) => resume());
+      final song=_currentSong;
+      if(song!=null) _loadAndPlay(song);
     } else {
       skipNext();
     }
@@ -305,6 +317,8 @@ class AudioPlayerService extends ChangeNotifier {
 
   @override
   void dispose() {
+    playbackSession++;
+    cancelPreroll();
     _webPositionTimer?.cancel();
     _player.dispose();
     super.dispose();
