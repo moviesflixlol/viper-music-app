@@ -7,9 +7,17 @@ List<Song> moreSongs({required List<Song> queue, required String? currentId,
   final index = queue.indexWhere((song) => song.id == currentId);
   final played = index < 0 ? <Song>[] : queue.take(index + 1);
   final upcoming = index < 0 ? queue : queue.skip(index + 1);
+  String identity(Song song) {
+    final artist = song.artist.toLowerCase().trim();
+    var title = song.title.toLowerCase().trim();
+    if (title.startsWith('$artist - ')) title = title.substring(artist.length + 3);
+    title = title.replaceAll(RegExp(r'\s*[\(\[][^)\]]*(official|audio|video|lyrics?|visualizer|visualiser)[^)\]]*[\)\]]'), '').trim();
+    return '$title|$artist';
+  }
   final seen = <String>{if (currentId != null) currentId, ...played.map((s) => s.id)};
+  final titles = played.map(identity).toSet();
   return [...upcoming, ...recommended, ...trending]
-      .where((song) => song.id.isNotEmpty && seen.add(song.id)).toList();
+      .where((song) => song.id.isNotEmpty && seen.add(song.id) && titles.add(identity(song))).toList();
 }
 
 class SwipeUpSongs extends StatefulWidget {

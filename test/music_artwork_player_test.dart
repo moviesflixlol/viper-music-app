@@ -24,6 +24,13 @@ void main() {
    final choices=moreSongs(queue:[song('a'),song('b'),song('c')],currentId:'b',recommended:[song('a'),song('d')],trending:[]);
    expect(choices.map((s)=>s.id),['c','d']);
  });
+ test('up next removes alternate videos of the same song', () {
+   final current = Song(id:'a',title:'Birds',artist:'Billie',thumbnailUrl:'');
+   final duplicate = Song(id:'b',title:'Billie - Birds (Official Video)',artist:'Billie',thumbnailUrl:'');
+   final next = Song(id:'c',title:'Lovely',artist:'Billie',thumbnailUrl:'');
+   final alternate = Song(id:'d',title:'Lovely (Official Audio)',artist:'Billie',thumbnailUrl:'');
+   expect(moreSongs(queue:[current],currentId:'a',recommended:[duplicate,next,alternate],trending:[]).map((s)=>s.id),['c']);
+ });
  testWidgets('playlist artwork is a square containing the first four covers', (tester) async {
    final pl=Playlist(id:'playlist',name:'My playlist',tracks:List.generate(5,(i)=>song('$i')));
    await tester.pumpWidget(MaterialApp(home:Center(child:PlaylistArtwork(playlist:pl,size:160))));
