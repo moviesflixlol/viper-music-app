@@ -37,55 +37,49 @@ class _SearchScreenState extends State<SearchScreen> {
       title: 'Music',
       color: Color(0xFFE91E63),
       query: 'top songs',
-      imageUrl:
-          'https://i.scdn.co/image/ab67706f00000002b8d00938f38634812a321cfc',
+      imageUrl: 'assets/search_cards/music.png',
     ),
     SearchCategory(
       title: 'Podcasts',
       color: Color(0xFF00796B),
       query: 'trending podcasts english hindi',
-      imageUrl:
-          'https://i.scdn.co/image/ab6765630000ba8aa2e2fb4209930773d328dd4c',
+      imageUrl: 'assets/search_cards/podcasts.png',
     ),
     SearchCategory(
       title: 'Bollywood',
       color: Color(0xFFC2185B),
       query: 'bollywood hits',
-      imageUrl:
-          'https://i.scdn.co/image/ab67706f0000000201dc9ebc44122d256cd1b5b2',
+      imageUrl: 'assets/search_cards/bollywood.png',
     ),
     SearchCategory(
       title: 'Home of I-Pop',
       color: Color(0xFF1E3A8A),
       query: 'indian pop',
-      imageUrl:
-          'https://i.scdn.co/image/ab67706f000000021c5756df6ad4720973a11681',
+      imageUrl: 'assets/search_cards/home-of-i-pop.png',
     ),
     SearchCategory(
       title: 'Punjabi Hits',
       color: Color(0xFFE65100),
       query: 'punjabi hits',
-      imageUrl:
-          'https://i.scdn.co/image/ab67706f0000000234e4026ceb61c56598c114f6',
+      imageUrl: 'assets/search_cards/punjabi-hits.png',
     ),
     SearchCategory(
       title: 'Made For You',
       color: Color(0xFF7E57C2),
       query: 'viral hits',
-      imageUrl:
-          'https://i.scdn.co/image/ab67706f000000025f17101683935391e4dbfb3b',
+      imageUrl: 'assets/search_cards/made-for-you.png',
     ),
     SearchCategory(
       title: 'Hip-Hop',
       color: Color(0xFF5D4037),
       query: 'hip hop essentials',
-      imageUrl: 'https://i.ytimg.com/vi/H58vbez_m4E/hqdefault.jpg',
+      imageUrl: 'assets/search_cards/hip-hop.png',
     ),
     SearchCategory(
       title: 'Acoustic Chill',
       color: Color(0xFF455A64),
       query: 'acoustic chill',
-      imageUrl: 'https://i.ytimg.com/vi/2Vv-BfVoq4g/hqdefault.jpg',
+      imageUrl: 'assets/search_cards/acoustic-chill.png',
     ),
   ];
 
@@ -314,70 +308,23 @@ class _SearchScreenState extends State<SearchScreen> {
             crossAxisCount: 2,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 1.8,
+            childAspectRatio: 1.0,
           ),
           itemCount: _browseCategories.length,
           itemBuilder: (context, index) {
             final cat = _browseCategories[index];
-            return GestureDetector(
+            return Semantics(button: true, label: cat.title, child: InkWell(
               onTap: () => _executeSearch(cat.query),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: cat.color,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Stack(
-                  children: [
-                    // Title
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      right: 48,
-                      child: Text(
-                        cat.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                    ),
-
-                    // Tilted Artwork Image in bottom right corner (exact Spotify style)
-                    Positioned(
-                      bottom: -8,
-                      right: -12,
-                      child: Transform.rotate(
-                        angle: 0.45,
-                        child: Container(
-                          width: 68,
-                          height: 68,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(6),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.4),
-                                blurRadius: 6,
-                                offset: const Offset(-2, 2),
-                              ),
-                            ],
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: MusicArtwork(
-                            cat.imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                Container(color: Colors.black26),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
+              borderRadius: BorderRadius.circular(12),
+              child: ClipRRect(borderRadius: BorderRadius.circular(12), child: Stack(fit: StackFit.expand, children: [
+                Image.asset(cat.imageUrl, fit: BoxFit.cover),
+                const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
+                  begin: Alignment.center, end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Colors.black87]))),
+                Positioned(left: 12, right: 10, bottom: 12, child: Text(cat.title,
+                  style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800))),
+              ])),
+            ));
           },
         ),
       ],
