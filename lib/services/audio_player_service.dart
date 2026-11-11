@@ -8,6 +8,7 @@ import 'file_helper.dart';
 import 'web_audio_bridge.dart';
 
 enum PlaybackState { idle, loading, playing, paused, completed, error }
+
 enum PlayerRepeatMode { off, all, one }
 
 class AudioPlayerService extends ChangeNotifier {
@@ -15,6 +16,7 @@ class AudioPlayerService extends ChangeNotifier {
   final AudioPlayer _player = AudioPlayer();
   Timer? _webPositionTimer;
 
+  int playbackSession = 0;
   Song? _currentSong;
   List<Song> _queue = [];
   int _currentIndex = -1;
@@ -93,6 +95,7 @@ class AudioPlayerService extends ChangeNotifier {
   }
 
   Future<void> _loadAndPlay(Song song) async {
+    playbackSession++;
     _currentSong = song;
     _state = PlaybackState.loading;
     _position = Duration.zero;
@@ -114,7 +117,10 @@ class AudioPlayerService extends ChangeNotifier {
       }
 
       // 2. Native Offline File Playback
-      if (!kIsWeb && song.isDownloaded && song.localFilePath != null && checkFileExists(song.localFilePath!)) {
+      if (!kIsWeb &&
+          song.isDownloaded &&
+          song.localFilePath != null &&
+          checkFileExists(song.localFilePath!)) {
         final source = getAudioSourceForFile(song.localFilePath!);
         if (source != null) {
           await _player.setAudioSource(source);
@@ -134,7 +140,8 @@ class AudioPlayerService extends ChangeNotifier {
           AudioSource.uri(
             Uri.parse(streamUrl),
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             },
           ),
         );
@@ -163,8 +170,10 @@ class AudioPlayerService extends ChangeNotifier {
 
   void _startWebPositionTimer() {
     _webPositionTimer?.cancel();
-    _webPositionTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      if (_state != PlaybackState.playing && _state != PlaybackState.paused) return;
+    _webPositionTimer =
+        Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      if (_state != PlaybackState.playing && _state != PlaybackState.paused)
+        return;
 
       final currentSec = WebAudioBridge.getCurrentTime();
       final totalSec = WebAudioBridge.getDuration();
@@ -222,7 +231,8 @@ class AudioPlayerService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> togglePlayPause() async => isPlaying ? await pause() : await resume();
+  Future<void> togglePlayPause() async =>
+      isPlaying ? await pause() : await resume();
 
   Future<void> seek(Duration position) async {
     if (kIsWeb && WebAudioBridge.isSupported) {

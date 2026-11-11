@@ -9,11 +9,13 @@ import '../models/playlist.dart';
 import '../models/user.dart';
 
 class ArtistItem {
+  final String id;
   final String name;
   final String imageUrl;
   final String genre;
 
   const ArtistItem({
+    this.id = '',
     required this.name,
     required this.imageUrl,
     required this.genre,
@@ -21,6 +23,7 @@ class ArtistItem {
 
   factory ArtistItem.fromJson(Map<String, dynamic> json) {
     return ArtistItem(
+      id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? 'Artist',
       imageUrl: json['imageUrl'] as String? ?? '',
       genre: json['genre'] as String? ?? 'Pop',
@@ -28,8 +31,48 @@ class ArtistItem {
   }
 }
 
+class ReleaseItem {
+  final String id, title, artist, thumbnail, subtitle, section;
+  const ReleaseItem(
+      {required this.id,
+      required this.title,
+      required this.artist,
+      required this.thumbnail,
+      required this.subtitle,
+      this.section = ''});
+  factory ReleaseItem.fromJson(Map<String, dynamic> data) => ReleaseItem(
+      id: data['id'] as String? ?? '',
+      title: data['title'] as String? ?? '',
+      artist: data['artist'] as String? ?? '',
+      thumbnail: data['thumbnail'] as String? ?? '',
+      subtitle: data['subtitle'] as String? ?? '',
+      section: data['section'] as String? ?? '');
+}
+
+class CatalogResult {
+  final List<Song> songs;
+  final List<ArtistItem> artists;
+  final List<ReleaseItem> albums;
+  const CatalogResult(
+      {this.songs = const [], this.artists = const [], this.albums = const []});
+  factory CatalogResult.fromJson(Map<String, dynamic> data) => CatalogResult(
+      songs: (data['songs'] ?? data['results'] ?? <dynamic>[])
+          .map<Song>((e) => Song.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      artists: (data['artists'] ?? <dynamic>[])
+          .map<ArtistItem>(
+              (e) => ArtistItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      albums: (data['albums'] ?? <dynamic>[])
+          .map<ReleaseItem>(
+              (e) => ReleaseItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList());
+}
+
 class FeedResult {
-  final Song featured;
+  final Song? featured;
+  final List<Song> mostListened, newReleases;
+  final List<ReleaseItem> releaseAlbums;
   final List<Song> recommended;
   final List<Playlist> mixes;
   final List<Song> trending;
@@ -39,6 +82,9 @@ class FeedResult {
 
   FeedResult({
     required this.featured,
+    this.mostListened = const [],
+    this.newReleases = const [],
+    this.releaseAlbums = const [],
     required this.recommended,
     required this.mixes,
     required this.trending,
@@ -60,7 +106,8 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       _deviceId = prefs.getString('device_session_id');
       if (_deviceId == null || _deviceId!.isEmpty) {
-        _deviceId = 'dev_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(999999)}';
+        _deviceId =
+            'dev_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(999999)}';
         await prefs.setString('device_session_id', _deviceId!);
       }
     } catch (_) {
@@ -93,32 +140,37 @@ class ApiService {
   }
 
   /// Fetch intelligent recommendation feed from NextViper
-  Future<FeedResult?> getFeed({String? token, String? category, String? country}) async {
+  Future<FeedResult?> getFeed(
+      {String? token,
+      String? category,
+      String? country,
+      List<String> exclude = const []}) async {
     try {
-      final detectedCountry = country ?? ui.PlatformDispatcher.instance.locale.countryCode ?? 'IN';
-      final queryParam = StringBuffer('?country=${Uri.encodeComponent(detectedCountry)}');
+      final detectedCountry =
+          country ?? ui.PlatformDispatcher.instance.locale.countryCode ?? 'IN';
+      final queryParam =
+          StringBuffer('?country=${Uri.encodeComponent(detectedCountry)}');
       if (category != null && category.isNotEmpty && category != 'All') {
         queryParam.write('&category=${Uri.encodeComponent(category)}');
       }
-      queryParam.write('&r=${DateTime.now().millisecondsSinceEpoch}');
+      if (exclude.isNotEmpty)
+        queryParam.write(
+            '&exclude=${Uri.encodeComponent(exclude.take(150).join(','))}');
 
       final uri = Uri.parse('$baseUrl${ApiConstants.feedEndpoint}$queryParam');
       final response = await http
           .get(uri, headers: _buildHeaders(token: token))
-          .timeout(const Duration(seconds: 12));
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
 
         final featuredJson = data['featured'] as Map<String, dynamic>?;
-        final featuredSong = featuredJson != null
-            ? Song.fromJson(featuredJson)
-            : const Song(
-                id: '4NRXx6U8ABQ',
-                title: 'Blinding Lights',
-                artist: 'The Weeknd',
-                thumbnailUrl: 'https://i.ytimg.com/vi/4NRXx6U8ABQ/hqdefault.jpg',
-              );
+        final featuredSong =
+            featuredJson == null ? null : Song.fromJson(featuredJson);
+        List<Song> songs(String key) => (data[key] as List<dynamic>? ?? [])
+            .map((e) => Song.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
 
         final recList = (data['recommendedForYou'] as List<dynamic>? ?? [])
             .whereType<Map<String, dynamic>>()
@@ -146,6 +198,11 @@ class ApiService {
 
         return FeedResult(
           featured: featuredSong,
+          mostListened: songs('mostListened'),
+          newReleases: songs('newReleases'),
+          releaseAlbums: (data['releaseAlbums'] as List<dynamic>? ?? [])
+              .map((e) => ReleaseItem.fromJson(Map<String, dynamic>.from(e)))
+              .toList(),
           recommended: recList,
           mixes: mixesList,
           trending: trendList,
@@ -169,12 +226,19 @@ class ApiService {
     String artist = '',
     String genre = 'Pop',
     String? token,
+    Song? song,
+    String? playbackId,
   }) async {
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.telemetryEventEndpoint}');
       final body = jsonEncode({
         'trackId': trackId,
         'eventType': eventType,
+        if (song != null) ...{
+          'title': song.title,
+          'thumbnail': song.thumbnailUrl
+        },
+        if (playbackId != null) 'playbackId': playbackId,
         'duration': duration,
         'playedSeconds': playedSeconds,
         'artist': artist,
@@ -193,7 +257,8 @@ class ApiService {
   /// Search tracks via NextViper backend
   Future<List<Song>> search(String query) async {
     try {
-      final uri = Uri.parse('$baseUrl${ApiConstants.searchEndpoint}?q=${Uri.encodeComponent(query)}');
+      final uri = Uri.parse(
+          '$baseUrl${ApiConstants.searchEndpoint}?q=${Uri.encodeComponent(query)}');
       final response = await http.get(uri).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
@@ -211,10 +276,51 @@ class ApiService {
     }
   }
 
+  Future<CatalogResult> searchCatalog(String query) async {
+    if (query.trim().isEmpty) return const CatalogResult();
+    final response = await http
+        .get(
+            Uri.parse('$baseUrl/api/search')
+                .replace(queryParameters: {'q': query}),
+            headers: _buildHeaders())
+        .timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200)
+      throw Exception('Search is unavailable. Please retry.');
+    return CatalogResult.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<CatalogResult> browse(String id) async {
+    final response = await http
+        .get(
+            Uri.parse('$baseUrl/api/browse')
+                .replace(queryParameters: {'id': id}),
+            headers: _buildHeaders())
+        .timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200)
+      throw Exception('Could not load this release. Please retry.');
+    return CatalogResult.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<List<Song>> related(String id) async {
+    final response = await http
+        .get(
+            Uri.parse('$baseUrl/api/related')
+                .replace(queryParameters: {'id': id}),
+            headers: _buildHeaders())
+        .timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200) return [];
+    return CatalogResult.fromJson(
+            jsonDecode(response.body) as Map<String, dynamic>)
+        .songs;
+  }
+
   /// Resolve stream information for a track
   Future<String?> resolveStreamUrl(String videoId) async {
     try {
-      final uri = Uri.parse('$baseUrl${ApiConstants.resolveEndpoint}?id=$videoId');
+      final uri =
+          Uri.parse('$baseUrl${ApiConstants.resolveEndpoint}?id=$videoId');
       final response = await http.get(uri).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -243,16 +349,18 @@ class ApiService {
   }) async {
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.registerEndpoint}');
-      final response = await http.post(
-        uri,
-        headers: _buildHeaders(),
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-          'name': name,
-          'interests': interests,
-        }),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            uri,
+            headers: _buildHeaders(),
+            body: jsonEncode({
+              'email': email,
+              'password': password,
+              'name': name,
+              'interests': interests,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -261,15 +369,24 @@ class ApiService {
             'success': true,
             'verificationRequired': true,
             'email': email,
-            'message': data['message'] ?? 'Verification code sent to your email',
+            'message':
+                data['message'] ?? 'Verification code sent to your email',
           };
         }
         final token = data['token'] as String? ?? '';
         final userJson = data['user'] as Map<String, dynamic>? ?? {};
         final user = UserModel.fromJson(userJson, token: token);
-        return {'success': true, 'verificationRequired': false, 'user': user, 'token': token};
+        return {
+          'success': true,
+          'verificationRequired': false,
+          'user': user,
+          'token': token
+        };
       }
-      return {'success': false, 'error': data['error'] ?? 'Registration failed'};
+      return {
+        'success': false,
+        'error': data['error'] ?? 'Registration failed'
+      };
     } catch (e) {
       return {'success': false, 'error': 'Connection error: $e'};
     }
@@ -281,20 +398,30 @@ class ApiService {
   }) async {
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.verifyEmailEndpoint}');
-      final response = await http.post(
-        uri,
-        headers: _buildHeaders(),
-        body: jsonEncode({'email': email, 'code': code}),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            uri,
+            headers: _buildHeaders(),
+            body: jsonEncode({'email': email, 'code': code}),
+          )
+          .timeout(const Duration(seconds: 10));
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 201 || response.statusCode == 200) {
         final token = data['token'] as String? ?? '';
         final userJson = data['user'] as Map<String, dynamic>? ?? {};
         final user = UserModel.fromJson(userJson, token: token);
-        return {'success': true, 'verificationRequired': false, 'user': user, 'token': token};
+        return {
+          'success': true,
+          'verificationRequired': false,
+          'user': user,
+          'token': token
+        };
       }
-      return {'success': false, 'error': data['error'] ?? 'Verification failed'};
+      return {
+        'success': false,
+        'error': data['error'] ?? 'Verification failed'
+      };
     } catch (e) {
       return {'success': false, 'error': 'Connection error: $e'};
     }
@@ -303,15 +430,20 @@ class ApiService {
   Future<Map<String, dynamic>> forgotPassword({required String email}) async {
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.forgotPasswordEndpoint}');
-      final response = await http.post(
-        uri,
-        headers: _buildHeaders(),
-        body: jsonEncode({'email': email}),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            uri,
+            headers: _buildHeaders(),
+            body: jsonEncode({'email': email}),
+          )
+          .timeout(const Duration(seconds: 10));
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 200) {
-        return {'success': true, 'message': data['message'] ?? 'Password reset code sent'};
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Password reset code sent'
+        };
       }
       return {'success': false, 'error': data['error'] ?? 'Request failed'};
     } catch (e) {
@@ -326,15 +458,21 @@ class ApiService {
   }) async {
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.resetPasswordEndpoint}');
-      final response = await http.post(
-        uri,
-        headers: _buildHeaders(),
-        body: jsonEncode({'email': email, 'code': code, 'newPassword': newPassword}),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            uri,
+            headers: _buildHeaders(),
+            body: jsonEncode(
+                {'email': email, 'code': code, 'newPassword': newPassword}),
+          )
+          .timeout(const Duration(seconds: 10));
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 200) {
-        return {'success': true, 'message': data['message'] ?? 'Password reset successfully'};
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Password reset successfully'
+        };
       }
       return {'success': false, 'error': data['error'] ?? 'Reset failed'};
     } catch (e) {
@@ -348,11 +486,13 @@ class ApiService {
   }) async {
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.resendCodeEndpoint}');
-      final response = await http.post(
-        uri,
-        headers: _buildHeaders(),
-        body: jsonEncode({'email': email, 'type': type}),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            uri,
+            headers: _buildHeaders(),
+            body: jsonEncode({'email': email, 'type': type}),
+          )
+          .timeout(const Duration(seconds: 10));
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 200) {
@@ -370,20 +510,30 @@ class ApiService {
   }) async {
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.loginEndpoint}');
-      final response = await http.post(
-        uri,
-        headers: _buildHeaders(),
-        body: jsonEncode({'email': email, 'password': password}),
-      ).timeout(const Duration(seconds: 8));
+      final response = await http
+          .post(
+            uri,
+            headers: _buildHeaders(),
+            body: jsonEncode({'email': email, 'password': password}),
+          )
+          .timeout(const Duration(seconds: 8));
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 200) {
         final token = data['token'] as String? ?? '';
         final userJson = data['user'] as Map<String, dynamic>? ?? {};
         final user = UserModel.fromJson(userJson, token: token);
-        return {'success': true, 'verificationRequired': false, 'user': user, 'token': token};
+        return {
+          'success': true,
+          'verificationRequired': false,
+          'user': user,
+          'token': token
+        };
       }
-      return {'success': false, 'error': data['error'] ?? 'Invalid credentials'};
+      return {
+        'success': false,
+        'error': data['error'] ?? 'Invalid credentials'
+      };
     } catch (e) {
       return {'success': false, 'error': 'Connection error: $e'};
     }
@@ -453,11 +603,13 @@ class ApiService {
       if (id != null && id.isNotEmpty) {
         bodyMap['id'] = id;
       }
-      final response = await http.post(
-        uri,
-        headers: _buildHeaders(token: token),
-        body: jsonEncode(bodyMap),
-      ).timeout(const Duration(seconds: 6));
+      final response = await http
+          .post(
+            uri,
+            headers: _buildHeaders(token: token),
+            body: jsonEncode(bodyMap),
+          )
+          .timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -475,14 +627,17 @@ class ApiService {
     String? token,
   }) async {
     try {
-      final uri = Uri.parse('$baseUrl${ApiConstants.playlistsEndpoint}/$playlistId/tracks');
-      final response = await http.post(
-        uri,
-        headers: _buildHeaders(token: token),
-        body: jsonEncode({
-          'track': track.toJson(),
-        }),
-      ).timeout(const Duration(seconds: 6));
+      final uri = Uri.parse(
+          '$baseUrl${ApiConstants.playlistsEndpoint}/$playlistId/tracks');
+      final response = await http
+          .post(
+            uri,
+            headers: _buildHeaders(token: token),
+            body: jsonEncode({
+              'track': track.toJson(),
+            }),
+          )
+          .timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -500,7 +655,8 @@ class ApiService {
     String? token,
   }) async {
     try {
-      final uri = Uri.parse('$baseUrl${ApiConstants.playlistsEndpoint}/$playlistId/tracks/$trackId');
+      final uri = Uri.parse(
+          '$baseUrl${ApiConstants.playlistsEndpoint}/$playlistId/tracks/$trackId');
       final response = await http
           .delete(uri, headers: _buildHeaders(token: token))
           .timeout(const Duration(seconds: 6));
@@ -515,7 +671,8 @@ class ApiService {
     String? token,
   }) async {
     try {
-      final uri = Uri.parse('$baseUrl${ApiConstants.playlistsEndpoint}/$playlistId');
+      final uri =
+          Uri.parse('$baseUrl${ApiConstants.playlistsEndpoint}/$playlistId');
       final response = await http
           .delete(uri, headers: _buildHeaders(token: token))
           .timeout(const Duration(seconds: 6));
@@ -531,16 +688,18 @@ class ApiService {
   }) async {
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.saveMixEndpoint}');
-      final response = await http.post(
-        uri,
-        headers: _buildHeaders(token: token),
-        body: jsonEncode({
-          'title': mix.name,
-          'description': mix.description,
-          'coverUrl': mix.coverUrl,
-          'tracks': mix.tracks.map((t) => t.toJson()).toList(),
-        }),
-      ).timeout(const Duration(seconds: 6));
+      final response = await http
+          .post(
+            uri,
+            headers: _buildHeaders(token: token),
+            body: jsonEncode({
+              'title': mix.name,
+              'description': mix.description,
+              'coverUrl': mix.coverUrl,
+              'tracks': mix.tracks.map((t) => t.toJson()).toList(),
+            }),
+          )
+          .timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;

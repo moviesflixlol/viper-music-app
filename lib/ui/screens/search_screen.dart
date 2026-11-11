@@ -1,4 +1,5 @@
 import '../components/music_artwork.dart';
+import 'artist_detail_screen.dart';
 import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
 import '../../state/music_controller.dart';
@@ -36,37 +37,43 @@ class _SearchScreenState extends State<SearchScreen> {
       title: 'Music',
       color: Color(0xFFE91E63),
       query: 'top songs',
-      imageUrl: 'https://i.scdn.co/image/ab67706f00000002b8d00938f38634812a321cfc',
+      imageUrl:
+          'https://i.scdn.co/image/ab67706f00000002b8d00938f38634812a321cfc',
     ),
     SearchCategory(
       title: 'Podcasts',
       color: Color(0xFF00796B),
       query: 'trending podcasts english hindi',
-      imageUrl: 'https://i.scdn.co/image/ab6765630000ba8aa2e2fb4209930773d328dd4c',
+      imageUrl:
+          'https://i.scdn.co/image/ab6765630000ba8aa2e2fb4209930773d328dd4c',
     ),
     SearchCategory(
       title: 'Bollywood',
       color: Color(0xFFC2185B),
       query: 'bollywood hits',
-      imageUrl: 'https://i.scdn.co/image/ab67706f0000000201dc9ebc44122d256cd1b5b2',
+      imageUrl:
+          'https://i.scdn.co/image/ab67706f0000000201dc9ebc44122d256cd1b5b2',
     ),
     SearchCategory(
       title: 'Home of I-Pop',
       color: Color(0xFF1E3A8A),
       query: 'indian pop',
-      imageUrl: 'https://i.scdn.co/image/ab67706f000000021c5756df6ad4720973a11681',
+      imageUrl:
+          'https://i.scdn.co/image/ab67706f000000021c5756df6ad4720973a11681',
     ),
     SearchCategory(
       title: 'Punjabi Hits',
       color: Color(0xFFE65100),
       query: 'punjabi hits',
-      imageUrl: 'https://i.scdn.co/image/ab67706f0000000234e4026ceb61c56598c114f6',
+      imageUrl:
+          'https://i.scdn.co/image/ab67706f0000000234e4026ceb61c56598c114f6',
     ),
     SearchCategory(
       title: 'Made For You',
       color: Color(0xFF7E57C2),
       query: 'viral hits',
-      imageUrl: 'https://i.scdn.co/image/ab67706f000000025f17101683935391e4dbfb3b',
+      imageUrl:
+          'https://i.scdn.co/image/ab67706f000000025f17101683935391e4dbfb3b',
     ),
     SearchCategory(
       title: 'Hip-Hop',
@@ -116,7 +123,10 @@ class _SearchScreenState extends State<SearchScreen> {
                       fit: BoxFit.contain,
                       errorBuilder: (_, __, ___) => const Text(
                         'M',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22),
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 22),
                       ),
                     ),
                   ),
@@ -131,7 +141,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                   ),
                   const Spacer(),
-                  const Icon(Icons.camera_alt_outlined, color: Colors.white70, size: 24),
+                  const Icon(Icons.camera_alt_outlined,
+                      color: Colors.white70, size: 24),
                 ],
               ),
             ),
@@ -154,16 +165,24 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
                 child: TextField(
                   controller: _searchFieldController,
-                  style: const TextStyle(color: Colors.black, fontSize: 15, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500),
                   textInputAction: TextInputAction.search,
                   onSubmitted: (query) => controller.search(query),
                   decoration: InputDecoration(
-                    hintText: 'What do you want to listen to?',
-                    hintStyle: const TextStyle(color: Color(0xFF757575), fontSize: 14, fontWeight: FontWeight.w500),
-                    prefixIcon: const Icon(Icons.search_rounded, color: Colors.black87, size: 24),
+                    hintText: 'Search songs and artists',
+                    hintStyle: const TextStyle(
+                        color: Color(0xFF757575),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500),
+                    prefixIcon: const Icon(Icons.search_rounded,
+                        color: Colors.black87, size: 24),
                     suffixIcon: _searchFieldController.text.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, color: Colors.black54, size: 20),
+                            icon: const Icon(Icons.clear_rounded,
+                                color: Colors.black54, size: 20),
                             onPressed: () {
                               _searchFieldController.clear();
                               controller.search('');
@@ -182,65 +201,88 @@ class _SearchScreenState extends State<SearchScreen> {
             Expanded(
               child: controller.isSearching
                   ? const Center(
-                      child: CircularProgressIndicator(color: AppColors.primaryRed),
+                      child: CircularProgressIndicator(
+                          color: AppColors.primaryRed),
                     )
-                  : controller.searchResults.isNotEmpty
-                      ? ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                          itemCount: controller.searchResults.length + 1,
-                          itemBuilder: (context, index) {
-                            if (index == controller.searchResults.length) {
-                              return Padding(
-                                padding: const EdgeInsets.fromLTRB(24, 16, 24, 110),
-                                child: Center(
-                                  child: controller.isLoadingMoreSearch
-                                      ? const Padding(
-                                          padding: EdgeInsets.all(12),
-                                          child: CircularProgressIndicator(color: AppColors.primaryRed),
-                                        )
-                                      : OutlinedButton.icon(
-                                          style: OutlinedButton.styleFrom(
-                                            foregroundColor: Colors.white,
-                                            side: const BorderSide(color: AppColors.primaryRed, width: 1.5),
-                                            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                                          ),
-                                          icon: const Icon(Icons.add_rounded, color: AppColors.primaryRed),
-                                          label: const Text(
-                                            'LOAD MORE RESULTS',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              letterSpacing: 1.2,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                          onPressed: controller.loadMoreSearch,
-                                        ),
-                                ),
-                              );
-                            }
-
-                            final song = controller.searchResults[index];
-                            final isCurrent = controller.player.currentSong?.id == song.id;
-                            return SongTile(
-                              song: song,
-                              isPlaying: isCurrent && controller.player.isPlaying,
-                              isCurrentTrack: isCurrent,
-                              isDownloaded: controller.downloads.isDownloaded(song.id),
-                              isDownloading: controller.downloads.isDownloading(song.id),
-                              downloadProgress: controller.downloads.getDownloadProgress(song.id),
-                              onTap: () {
-                                controller.playSong(song, queueContext: controller.searchResults);
-                              },
-                              onDownload: () {
-                                controller.downloads.downloadSong(song);
-                              },
-                              trailing: IconButton(
-                                icon: const Icon(Icons.playlist_add, color: Colors.white54, size: 22),
-                                onPressed: () => AddToPlaylistSheet.show(context, controller, song),
-                              ),
-                            );
-                          },
+                  : controller.currentQuery.isNotEmpty
+                      ? ListView(
+                          padding: const EdgeInsets.only(bottom: 120),
+                          children: [
+                            if (controller.searchError != null)
+                              Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Column(children: [
+                                    Text(controller.searchError!,
+                                        style: const TextStyle(
+                                            color: Colors.white70)),
+                                    TextButton(
+                                        onPressed: () => controller
+                                            .search(controller.currentQuery),
+                                        child: const Text('Retry'))
+                                  ])),
+                            if (controller.searchArtists.isNotEmpty) ...[
+                              const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text('Artists',
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold))),
+                              ...controller.searchArtists.map((artist) =>
+                                  ListTile(
+                                    leading: ClipOval(
+                                        child: MusicArtwork(artist.imageUrl,
+                                            width: 56, height: 56)),
+                                    title: Text(artist.name,
+                                        style: const TextStyle(
+                                            color: Colors.white)),
+                                    subtitle: const Text('Artist',
+                                        style:
+                                            TextStyle(color: Colors.white54)),
+                                    trailing: const Icon(Icons.chevron_right,
+                                        color: Colors.white54),
+                                    onTap: () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                            builder: (_) => ArtistDetailScreen(
+                                                controller: controller,
+                                                artist: ArtistInfo(
+                                                    id: artist.id,
+                                                    name: artist.name,
+                                                    imageUrl: artist.imageUrl,
+                                                    genre: artist.genre)))),
+                                  )),
+                            ],
+                            if (controller.searchResults.isNotEmpty)
+                              const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text('Songs',
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold))),
+                            ...controller.searchResults.map((song) => SongTile(
+                                song: song,
+                                isPlaying: controller.player.currentSong?.id ==
+                                        song.id &&
+                                    controller.player.isPlaying,
+                                isCurrentTrack:
+                                    controller.player.currentSong?.id ==
+                                        song.id,
+                                onTap: () => controller.playSong(song,
+                                    queueContext: controller.searchResults),
+                                trailing: IconButton(
+                                    icon: const Icon(Icons.playlist_add,
+                                        color: Colors.white54),
+                                    onPressed: () => AddToPlaylistSheet.show(
+                                        context, controller, song)))),
+                            if (controller.searchError == null &&
+                                controller.searchResults.isEmpty &&
+                                controller.searchArtists.isEmpty)
+                              const Padding(
+                                  padding: EdgeInsets.all(24),
+                                  child: Text('No songs or artists found.',
+                                      style: TextStyle(color: Colors.white70))),
+                          ],
                         )
                       : _buildBrowseGrid(),
             ),
@@ -252,7 +294,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildBrowseGrid() {
     return ListView(
-      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+      physics:
+          const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
       children: [
         const Text(
@@ -264,7 +307,6 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ),
         const SizedBox(height: 12),
-
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -326,7 +368,8 @@ class _SearchScreenState extends State<SearchScreen> {
                           child: MusicArtwork(
                             cat.imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(color: Colors.black26),
+                            errorBuilder: (_, __, ___) =>
+                                Container(color: Colors.black26),
                           ),
                         ),
                       ),
