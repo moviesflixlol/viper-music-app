@@ -15,7 +15,7 @@ class FeedScreen extends StatelessWidget {
       builder: (context, _) {
         final c = controller;
         return RefreshIndicator(
-            onRefresh: c.loadInitialFeed,
+            onRefresh: c.refreshFeed,
             color: Colors.white,
             backgroundColor: const Color(0xff242424),
             child: CustomScrollView(
@@ -71,7 +71,7 @@ class FeedScreen extends StatelessWidget {
                     _heading(c.mostListened.isEmpty
                         ? 'Discover music'
                         : 'Recommended for you'),
-                    _songs(c.feedRecommendations),
+                    _songs(c.feedRecommendations.take(30).toList()),
                   ],
                   if (c.newReleases.isNotEmpty) ...[
                     _heading('New music videos'),
@@ -140,6 +140,13 @@ class FeedScreen extends StatelessWidget {
                                       context, c, song)));
                         }),
                   ],
+                  if (c.moreFeed.isNotEmpty) ...[
+                    _heading('More for you'),
+                    SliverList.builder(itemCount: c.moreFeed.length, itemBuilder: (_, i) => SongTile(
+                      song: c.moreFeed[i], onTap: () => c.playSong(c.moreFeed[i], queueContext: c.moreFeed))),
+                  ],
+                  if (c.feedMessage != null) SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(16),
+                    child: Text(c.feedMessage!, style: const TextStyle(color: Colors.white60)))),
                   if (!c.isFeedLoading && !c.isBackendConnected)
                     SliverToBoxAdapter(
                         child: Padding(
@@ -162,8 +169,8 @@ class FeedScreen extends StatelessWidget {
                                     : OutlinedButton(
                                         style: OutlinedButton.styleFrom(
                                             foregroundColor: Colors.white),
-                                        onPressed: c.loadMoreFeed,
-                                        child: const Text('Discover more'))))),
+                                        onPressed: c.feedHasMore ? c.loadMoreFeed : null,
+                                        child: Text(c.feedHasMore ? 'Load more songs' : 'You’re up to date'))))),
                   const SliverToBoxAdapter(child: SizedBox(height: 120)),
                 ]));
       });

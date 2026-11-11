@@ -24,7 +24,14 @@ class ArtistInfo {
 }
 
 class MusicController extends ChangeNotifier {
-  static const String _playlistsPrefsKey = 'viper_local_user_playlists';
+  String get _playlistsPrefsKey => 'viper_playlists_v3_${authService.currentUser?.id ?? apiService.deviceId}';
+  String _activeScope = '';
+  String _nextCursor = '';
+  bool _feedHasMore = false;
+  String? _feedMessage;
+  List<Song> _moreFeed = [];
+  bool _disposed = false;
+  int _feedGeneration = 0;
 
   final ApiService apiService;
   final AuthService authService;
@@ -91,6 +98,7 @@ class MusicController extends ChangeNotifier {
     downloads.addListener(notifyListeners);
     authService.addListener(_onAuthChanged);
 
+    _activeScope = authService.currentUser?.id ?? apiService.deviceId;
     // Initialize local persistent playlists immediately
     _initPlaylists();
     loadInitialFeed();
@@ -102,13 +110,27 @@ class MusicController extends ChangeNotifier {
   }
 
   void _onAuthChanged() {
+    final scope = authService.currentUser?.id ?? apiService.deviceId;
+    if (_activeScope == scope) return;
+    _activeScope = scope;
+    _isLoadingMoreFeed = false;
+    _feedHasMore = false;
+    _feedGeneration++;
+    _userPlaylists = [];
     _mostListened = [];
     _feedRecommendations = [];
     _trendingTracks = [];
-    loadUserPlaylists();
+    _newReleases = [];
+    _releaseAlbums = [];
+    _moreFeed = [];
+    _initPlaylists();
     loadInitialFeed();
     notifyListeners();
   }
+  List<Song> get moreFeed => _moreFeed;
+  bool get feedHasMore => _feedHasMore;
+  String? get feedMessage => _feedMessage;
+  Future<void> refreshFeed() => loadInitialFeed(force: true);
 
   int get selectedTabIndex => _selectedTabIndex;
   String get selectedCategory => _selectedCategory;
@@ -151,6 +173,7 @@ class MusicController extends ChangeNotifier {
         playing: player.isPlaying);
     final song = player.currentSong;
     if (qualified && song != null) {
+      final scope = _activeScope;
       apiService
           .sendRecommendationEvent(
               trackId: song.id,
@@ -161,8 +184,13 @@ class MusicController extends ChangeNotifier {
               token: authService.token,
               song: song,
               playbackId: '$_sessionPrefix-${player.playbackSession}')
-          .then((saved) {
-        if (saved) loadInitialFeed();
+          .then((saved) async {
+        if (!saved || _disposed || scope != _activeScope) return;
+        final cached = await apiService.cacheQualifiedListen(song);
+        if (cached != null && !_disposed && scope == _activeScope) {
+          _mostListened = cached.mostListened;
+          notifyListeners();
+        }
       });
     }
     notifyListeners();
@@ -190,18 +218,25 @@ class MusicController extends ChangeNotifier {
   }
 
   /// Fetch recommendation feed from NextViper AWS backend
-  Future<void> loadInitialFeed() async {
+  Future<void> loadInitialFeed({bool force = false}) async {
+    final generation = ++_feedGeneration;
+    final scope = _activeScope;
     _isFeedLoading = true;
     notifyListeners();
 
     try {
       final feed = await apiService.getFeed(
         token: authService.token,
-        category: _selectedCategory,
+        category: _selectedCategory, force: force,
       );
+      if (_disposed || generation != _feedGeneration || scope != _activeScope) return;
       _isBackendConnected = feed != null;
 
       if (feed != null) {
+        _nextCursor = feed.nextCursor;
+        _feedHasMore = feed.hasMore;
+        _feedMessage = null;
+        _moreFeed = [];
         _featuredSong = feed.featured;
         _feedRecommendations = feed.recommended;
         _trendingTracks = feed.trending;
@@ -226,39 +261,40 @@ class MusicController extends ChangeNotifier {
   }
 
   Future<void> loadMoreFeed() async {
-    if (_isLoadingMoreFeed) return;
+    if (_isLoadingMoreFeed || !_feedHasMore) return;
+    final scope = _activeScope;
     _isLoadingMoreFeed = true;
+    _feedMessage = null;
     notifyListeners();
-
     try {
-      final existing = [
-        ..._feedRecommendations,
-        ..._trendingTracks,
-        ..._newReleases
-      ];
-      final feed = await apiService.getFeed(
-          token: authService.token,
-          category: _selectedCategory,
-          exclude: existing.map((s) => s.id).toList());
-      if (feed != null) {
-        final ids = existing.map((s) => s.id).toSet();
-        _feedRecommendations = [
-          ..._feedRecommendations,
-          ...feed.recommended.where((song) => ids.add(song.id))
-        ];
+      final existing = [..._feedRecommendations, ..._trendingTracks, ..._newReleases];
+      final ids = existing.map((song) => song.id).toSet();
+      final additions = <Song>[];
+      for (var attempt = 0; attempt < 2 && _nextCursor.isNotEmpty; attempt++) {
+        final oldCursor = _nextCursor;
+        final feed = await apiService.getFeed(token: authService.token, category: _selectedCategory,
+          exclude: ids.toList(), cursor: oldCursor);
+        if (_disposed || scope != _activeScope) return;
+        if (feed == null) throw StateError('Feed unavailable');
+        _nextCursor = feed.nextCursor;
+        _feedHasMore = feed.hasMore && _nextCursor != oldCursor;
+        additions.addAll(feed.recommended.where((song) => ids.add(song.id)));
+        if (additions.isNotEmpty || !_feedHasMore) break;
       }
-    } catch (_) {}
-
-    _isLoadingMoreFeed = false;
-    notifyListeners();
+      _moreFeed = [..._moreFeed, ...additions];
+      _feedRecommendations = [..._feedRecommendations, ...additions];
+      if (additions.isEmpty) _feedMessage = _feedHasMore ? 'No new songs on this page. Try the next page.' : 'You’re up to date. Refresh later for more music.';
+    } catch (_) { _feedMessage = 'Could not load more songs. Please try again.'; }
+    finally { if (!_disposed && scope == _activeScope) { _isLoadingMoreFeed = false; notifyListeners(); } }
   }
 
   // --- Offline-First Local + Cloud Playlists ---
 
   Future<void> _loadLocalPlaylists() async {
+    final key = _playlistsPrefsKey;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedStr = prefs.getString(_playlistsPrefsKey);
+      final savedStr = prefs.getString(key);
       if (savedStr != null && savedStr.isNotEmpty) {
         final decoded = jsonDecode(savedStr) as List<dynamic>;
         final loaded = decoded
@@ -269,7 +305,7 @@ class MusicController extends ChangeNotifier {
                 p.name.toLowerCase() != 'untitled playlist')
             .toList();
 
-        if (loaded.isNotEmpty) {
+        if (!_disposed && key == _playlistsPrefsKey && loaded.isNotEmpty) {
           _userPlaylists = loaded;
           notifyListeners();
         }
@@ -278,32 +314,33 @@ class MusicController extends ChangeNotifier {
   }
 
   Future<void> _saveLocalPlaylists() async {
+    final key = _playlistsPrefsKey;
     try {
-      final prefs = await SharedPreferences.getInstance();
       final valid = _userPlaylists
           .where((p) =>
               p.name.trim().isNotEmpty &&
               p.name.toLowerCase() != 'untitled playlist')
           .map((p) => p.toJson())
           .toList();
-      await prefs.setString(_playlistsPrefsKey, jsonEncode(valid));
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, jsonEncode(valid));
     } catch (_) {}
   }
 
   Future<void> loadUserPlaylists() async {
+    final scope = _activeScope;
     _isPlaylistsLoading = true;
     notifyListeners();
 
     try {
       final remote = await apiService.getPlaylists(token: authService.token);
+      if (_disposed || scope != _activeScope) return;
       if (remote.isNotEmpty) {
         // Merge remote with local without losing playlists or tracks
         for (final r in remote) {
           final idx = _userPlaylists.indexWhere(
             (p) =>
-                p.id == r.id ||
-                (p.name.toLowerCase() == r.name.toLowerCase() &&
-                    r.name.trim().isNotEmpty),
+                p.id == r.id,
           );
           if (idx != -1) {
             final localPl = _userPlaylists[idx];
@@ -335,6 +372,8 @@ class MusicController extends ChangeNotifier {
 
   /// Create a real playlist immediately with 100% guarantee
   Future<bool> createPlaylist(String name, {String description = ''}) async {
+    final scope = _activeScope;
+    final token = authService.token;
     final trimmedName = name.trim();
     if (trimmedName.isEmpty ||
         trimmedName.toLowerCase() == 'untitled playlist') {
@@ -363,12 +402,12 @@ class MusicController extends ChangeNotifier {
       id: newPlaylist.id,
       name: trimmedName,
       description: description,
-      token: authService.token,
+      token: token,
     )
         .then((remotePl) {
-      if (remotePl != null) {
+      if (remotePl != null && !_disposed && scope == _activeScope) {
         final idx = _userPlaylists
-            .indexWhere((p) => p.id == newPlaylist.id || p.name == trimmedName);
+            .indexWhere((p) => p.id == newPlaylist.id);
         if (idx != -1) {
           final localTracks = _userPlaylists[idx].tracks;
           _userPlaylists[idx] = remotePl.copyWith(
@@ -385,6 +424,8 @@ class MusicController extends ChangeNotifier {
   }
 
   Future<bool> addSongToPlaylist(String playlistId, Song song) async {
+    final scope = _activeScope;
+    final token = authService.token;
     final idx = _userPlaylists.indexWhere((p) => p.id == playlistId);
     if (idx != -1) {
       final cur = _userPlaylists[idx];
@@ -398,6 +439,7 @@ class MusicController extends ChangeNotifier {
           updatedAt: DateTime.now().millisecondsSinceEpoch / 1000,
         );
         await _saveLocalPlaylists();
+      if (_disposed || scope != _activeScope) return true;
         notifyListeners();
 
         // Sync with cloud
@@ -405,7 +447,7 @@ class MusicController extends ChangeNotifier {
             .addTrackToPlaylist(
               playlistId: playlistId,
               track: song,
-              token: authService.token,
+              token: token,
             )
             .catchError((_) => null);
 
@@ -415,7 +457,7 @@ class MusicController extends ChangeNotifier {
           eventType: 'add_to_playlist',
           artist: song.artist,
           genre: song.genre,
-          token: authService.token,
+          token: token,
         );
         return true;
       }
@@ -424,19 +466,22 @@ class MusicController extends ChangeNotifier {
   }
 
   Future<bool> removeSongFromPlaylist(String playlistId, String songId) async {
+    final scope = _activeScope;
+    final token = authService.token;
     final idx = _userPlaylists.indexWhere((p) => p.id == playlistId);
     if (idx != -1) {
       final cur = _userPlaylists[idx];
       final updatedTracks = cur.tracks.where((t) => t.id != songId).toList();
       _userPlaylists[idx] = cur.copyWith(tracks: updatedTracks);
       await _saveLocalPlaylists();
+      if (_disposed || scope != _activeScope) return true;
       notifyListeners();
 
       apiService
           .removeTrackFromPlaylist(
             playlistId: playlistId,
             trackId: songId,
-            token: authService.token,
+            token: token,
           )
           .catchError((_) => false);
       return true;
@@ -445,14 +490,17 @@ class MusicController extends ChangeNotifier {
   }
 
   Future<bool> deletePlaylist(String playlistId) async {
+    final scope = _activeScope;
+    final token = authService.token;
     _userPlaylists.removeWhere((p) => p.id == playlistId);
     await _saveLocalPlaylists();
+      if (_disposed || scope != _activeScope) return true;
     notifyListeners();
 
     apiService
         .deletePlaylist(
           playlistId: playlistId,
-          token: authService.token,
+          token: token,
         )
         .catchError((_) => false);
     return true;
@@ -484,6 +532,7 @@ class MusicController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     player.removeListener(_onPlaybackChanged);
     downloads.removeListener(notifyListeners);
     authService.removeListener(_onAuthChanged);

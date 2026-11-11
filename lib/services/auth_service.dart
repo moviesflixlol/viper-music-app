@@ -29,6 +29,7 @@ class AuthService extends ChangeNotifier {
       if (_token != null && _token!.isNotEmpty && userJsonStr != null) {
         final userMap = jsonDecode(userJsonStr) as Map<String, dynamic>;
         _currentUser = UserModel.fromJson(userMap, token: _token!);
+        _apiService.cacheScope = 'user:${_currentUser!.id}';
 
         // Background verify with server
         final restoredToken = _token!;
@@ -59,6 +60,7 @@ class AuthService extends ChangeNotifier {
     if (result['success'] == true) {
       _token = result['token'] as String;
       _currentUser = result['user'] as UserModel;
+      _apiService.cacheScope = 'user:${_currentUser!.id}';
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyToken, _token!);
@@ -101,6 +103,7 @@ class AuthService extends ChangeNotifier {
       }
       _token = result['token'] as String;
       _currentUser = result['user'] as UserModel;
+      _apiService.cacheScope = 'user:${_currentUser!.id}';
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyToken, _token!);
@@ -127,6 +130,7 @@ class AuthService extends ChangeNotifier {
     if (result['success'] == true) {
       _token = result['token'] as String;
       _currentUser = result['user'] as UserModel;
+      _apiService.cacheScope = 'user:${_currentUser!.id}';
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyToken, _token!);
@@ -174,8 +178,12 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    final clearing = _apiService.clearUserCache();
+    _apiService.cacheScope = 'guest:${_apiService.deviceId}';
     _token = null;
     _currentUser = null;
+    await clearing;
+    if (_token != null) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_keyToken);

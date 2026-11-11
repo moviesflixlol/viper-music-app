@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_constants.dart';
 import '../models/song.dart';
+import 'local_music_cache.dart';
 import '../models/playlist.dart';
 import '../models/user.dart';
 
@@ -70,6 +71,8 @@ class CatalogResult {
 }
 
 class FeedResult {
+  final String nextCursor;
+  final bool hasMore;
   final Song? featured;
   final List<Song> mostListened, newReleases;
   final List<ReleaseItem> releaseAlbums;
@@ -82,6 +85,7 @@ class FeedResult {
 
   FeedResult({
     required this.featured,
+    this.nextCursor = '', this.hasMore = false,
     this.mostListened = const [],
     this.newReleases = const [],
     this.releaseAlbums = const [],
@@ -92,79 +96,7 @@ class FeedResult {
     this.country = 'IN',
     this.userInterests = const [],
   });
-}
-
-class ApiService {
-  String baseUrl;
-  String? _deviceId;
-  String get deviceId => _deviceId ?? 'dev_guest';
-
-  ApiService({this.baseUrl = ApiConstants.defaultBaseUrl});
-
-  Future<void> initialize() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _deviceId = prefs.getString('device_session_id');
-      if (_deviceId == null || _deviceId!.isEmpty) {
-        _deviceId =
-            'dev_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(999999)}';
-        await prefs.setString('device_session_id', _deviceId!);
-      }
-    } catch (_) {
-      _deviceId ??= 'dev_session_${DateTime.now().millisecondsSinceEpoch}';
-    }
-  }
-
-  Map<String, String> _buildHeaders({String? token}) {
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'x-device-id': deviceId,
-      'x-session-id': deviceId,
-    };
-    if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $token';
-    }
-    return headers;
-  }
-
-  /// Check NextViper backend connectivity
-  Future<bool> checkHealth() async {
-    try {
-      final uri = Uri.parse('$baseUrl${ApiConstants.healthEndpoint}');
-      final response = await http.get(uri).timeout(const Duration(seconds: 4));
-      return response.statusCode == 200;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  /// Fetch intelligent recommendation feed from NextViper
-  Future<FeedResult?> getFeed(
-      {String? token,
-      String? category,
-      String? country,
-      List<String> exclude = const []}) async {
-    try {
-      final detectedCountry =
-          country ?? ui.PlatformDispatcher.instance.locale.countryCode ?? 'IN';
-      final queryParam =
-          StringBuffer('?country=${Uri.encodeComponent(detectedCountry)}');
-      if (category != null && category.isNotEmpty && category != 'All') {
-        queryParam.write('&category=${Uri.encodeComponent(category)}');
-      }
-      if (exclude.isNotEmpty)
-        queryParam.write(
-            '&exclude=${Uri.encodeComponent(exclude.take(150).join(','))}');
-
-      final uri = Uri.parse('$baseUrl${ApiConstants.feedEndpoint}$queryParam');
-      final response = await http
-          .get(uri, headers: _buildHeaders(token: token))
-          .timeout(const Duration(seconds: 30));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-
+  factory FeedResult.fromJson(Map<String, dynamic> data) {
         final featuredJson = data['featured'] as Map<String, dynamic>?;
         final featuredSong =
             featuredJson == null ? null : Song.fromJson(featuredJson);
@@ -198,6 +130,7 @@ class ApiService {
 
         return FeedResult(
           featured: featuredSong,
+          nextCursor: data['nextCursor'] as String? ?? '', hasMore: data['hasMore'] as bool? ?? false,
           mostListened: songs('mostListened'),
           newReleases: songs('newReleases'),
           releaseAlbums: (data['releaseAlbums'] as List<dynamic>? ?? [])
@@ -207,11 +140,138 @@ class ApiService {
           mixes: mixesList,
           trending: trendList,
           artists: artistList,
-          country: data['country'] as String? ?? detectedCountry,
+          country: data['country'] as String? ?? 'IN',
           userInterests: userInterests,
         );
+  }
+}
+
+class ApiService {
+  String baseUrl;
+  final LocalMusicCache _cache = LocalMusicCache();
+  final Map<String, Future<Map<String, dynamic>>> _inflight = {};
+  final Map<String, int> _cacheEpoch = {};
+  final http.Client _client;
+  String cacheScope = 'guest';
+  Uri? _lastFeedUri;
+  String? _deviceId;
+  String get deviceId => _deviceId ?? 'dev_guest';
+
+  ApiService({this.baseUrl = ApiConstants.defaultBaseUrl, http.Client? client}) : _client = client ?? http.Client();
+
+  Future<void> initialize() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _deviceId = prefs.getString('device_session_id');
+      if (_deviceId == null || _deviceId!.isEmpty) {
+        _deviceId =
+            'dev_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(999999)}';
+        await prefs.setString('device_session_id', _deviceId!);
       }
-      return null;
+      cacheScope = 'guest:$deviceId';
+    } catch (_) {
+      _deviceId ??= 'dev_session_${DateTime.now().millisecondsSinceEpoch}';
+    }
+  }
+
+  Map<String, String> _buildHeaders({String? token}) {
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'x-device-id': deviceId,
+      'x-session-id': deviceId,
+    };
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  Future<Map<String, dynamic>> _cachedGet(Uri uri, {String? token,
+      required String scope, Duration ttl = const Duration(minutes: 10), bool force = false,
+      bool persist = true}) async {
+    final key = uri.toString();
+    final epoch = _cacheEpoch[scope] ?? 0;
+    if (!force && persist) {
+      try {
+        final saved = await _cache.read(scope, key);
+        if (saved != null) return saved;
+      } catch (_) {}
+    }
+    final flight = '$scope|$key';
+    if (_inflight.containsKey(flight)) return _inflight[flight]!;
+    final request = () async {
+      final response = await _client.get(uri, headers: _buildHeaders(token: token)).timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) throw Exception('Request failed (${response.statusCode})');
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (persist && epoch == (_cacheEpoch[scope] ?? 0)) {
+        try { await _cache.write(scope, key, data, ttl); } catch (_) {}
+      }
+      return data;
+    }();
+    _inflight[flight] = request;
+    try { return await request; } finally { _inflight.remove(flight); }
+  }
+  Future<FeedResult?> cacheQualifiedListen(Song song) async {
+    final uri = _lastFeedUri;
+    final scope = cacheScope;
+    if (uri == null) return null;
+    final data = await _cache.read(scope, uri.toString(), allowExpired: true);
+    if (data == null) return null;
+    final ranked = (data['mostListened'] as List<dynamic>? ?? [])
+      .map((e) => Map<String,dynamic>.from(e)).toList();
+    final previous = ranked.where((e) => e['id'] == song.id).firstOrNull;
+    ranked.removeWhere((e) => e['id'] == song.id);
+    ranked.add({...song.toJson(), 'playCount': ((previous?['playCount'] as num?) ?? 0) + 1,
+      'lastPlayed': DateTime.now().millisecondsSinceEpoch / 1000});
+    ranked.sort((a,b) { final count=(b['playCount'] as num).compareTo(a['playCount'] as num);
+      return count != 0 ? count : (b['lastPlayed'] as num).compareTo(a['lastPlayed'] as num); });
+    data['mostListened'] = ranked.take(12).toList();
+    await _cache.write(scope, uri.toString(), data, const Duration(minutes: 10));
+    return FeedResult.fromJson(data);
+  }
+  Future<void> clearUserCache() async {
+    final scope = cacheScope;
+    _cacheEpoch[scope] = (_cacheEpoch[scope] ?? 0) + 1;
+    try { await _cache.clearScope(scope); } catch (_) {}
+  }
+  Future<void> invalidatePlaylists() => _cache.remove(cacheScope, '$baseUrl${ApiConstants.playlistsEndpoint}');
+
+  /// Check NextViper backend connectivity
+  Future<bool> checkHealth() async {
+    try {
+      final uri = Uri.parse('$baseUrl${ApiConstants.healthEndpoint}');
+      final response = await http.get(uri).timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Fetch intelligent recommendation feed from NextViper
+  Future<FeedResult?> getFeed(
+      {String? token,
+      String? category,
+      String? country,
+      List<String> exclude = const [], String cursor = '', bool force = false}) async {
+    try {
+      final detectedCountry =
+          country ?? ui.PlatformDispatcher.instance.locale.countryCode ?? 'IN';
+      final queryParam =
+          StringBuffer('?country=${Uri.encodeComponent(detectedCountry)}');
+      if (category != null && category.isNotEmpty && category != 'All') {
+        queryParam.write('&category=${Uri.encodeComponent(category)}');
+      }
+      if (exclude.isNotEmpty)
+        queryParam.write(
+            '&exclude=${Uri.encodeComponent(exclude.take(450).join(','))}');
+
+      if (cursor.isNotEmpty) queryParam.write('&cursor=${Uri.encodeComponent(cursor)}');
+      final uri = Uri.parse('$baseUrl${ApiConstants.feedEndpoint}$queryParam');
+      if (cursor.isEmpty && exclude.isEmpty) _lastFeedUri = uri;
+      final data = await _cachedGet(uri, token: token, scope: cacheScope,
+        force: force, persist: cursor.isEmpty && exclude.isEmpty);
+      return FeedResult.fromJson(data);
     } catch (e) {
       return null;
     }
@@ -278,42 +338,18 @@ class ApiService {
 
   Future<CatalogResult> searchCatalog(String query) async {
     if (query.trim().isEmpty) return const CatalogResult();
-    final response = await http
-        .get(
-            Uri.parse('$baseUrl/api/search')
-                .replace(queryParameters: {'q': query}),
-            headers: _buildHeaders())
-        .timeout(const Duration(seconds: 15));
-    if (response.statusCode != 200)
-      throw Exception('Search is unavailable. Please retry.');
-    return CatalogResult.fromJson(
-        jsonDecode(response.body) as Map<String, dynamic>);
+    final uri = Uri.parse('$baseUrl/api/search').replace(queryParameters: {'q': query});
+    return CatalogResult.fromJson(await _cachedGet(uri, scope: 'public'));
   }
 
   Future<CatalogResult> browse(String id) async {
-    final response = await http
-        .get(
-            Uri.parse('$baseUrl/api/browse')
-                .replace(queryParameters: {'id': id}),
-            headers: _buildHeaders())
-        .timeout(const Duration(seconds: 15));
-    if (response.statusCode != 200)
-      throw Exception('Could not load this release. Please retry.');
-    return CatalogResult.fromJson(
-        jsonDecode(response.body) as Map<String, dynamic>);
+    final uri = Uri.parse('$baseUrl/api/browse').replace(queryParameters: {'id': id});
+    return CatalogResult.fromJson(await _cachedGet(uri, scope: 'public'));
   }
 
   Future<List<Song>> related(String id) async {
-    final response = await http
-        .get(
-            Uri.parse('$baseUrl/api/related')
-                .replace(queryParameters: {'id': id}),
-            headers: _buildHeaders())
-        .timeout(const Duration(seconds: 15));
-    if (response.statusCode != 200) return [];
-    return CatalogResult.fromJson(
-            jsonDecode(response.body) as Map<String, dynamic>)
-        .songs;
+    final uri = Uri.parse('$baseUrl/api/related').replace(queryParameters: {'id': id});
+    return CatalogResult.fromJson(await _cachedGet(uri, scope: 'public')).songs;
   }
 
   /// Resolve stream information for a track
@@ -568,19 +604,10 @@ class ApiService {
   Future<List<Playlist>> getPlaylists({String? token}) async {
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.playlistsEndpoint}');
-      final response = await http
-          .get(uri, headers: _buildHeaders(token: token))
-          .timeout(const Duration(seconds: 6));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final list = data['playlists'] as List<dynamic>? ?? [];
-        return list
-            .whereType<Map<String, dynamic>>()
-            .map((e) => Playlist.fromJson(e))
-            .toList();
-      }
-      return [];
+      final data = await _cachedGet(uri, token: token, scope: cacheScope,
+        ttl: const Duration(minutes: 5));
+      return (data['playlists'] as List<dynamic>? ?? []).whereType<Map<String, dynamic>>()
+        .map(Playlist.fromJson).toList();
     } catch (_) {
       return [];
     }
@@ -593,6 +620,7 @@ class ApiService {
     String coverUrl = '',
     String? token,
   }) async {
+    await invalidatePlaylists();
     try {
       final uri = Uri.parse('$baseUrl${ApiConstants.playlistsEndpoint}');
       final bodyMap = <String, dynamic>{
@@ -626,6 +654,7 @@ class ApiService {
     required Song track,
     String? token,
   }) async {
+    await invalidatePlaylists();
     try {
       final uri = Uri.parse(
           '$baseUrl${ApiConstants.playlistsEndpoint}/$playlistId/tracks');
@@ -654,6 +683,7 @@ class ApiService {
     required String trackId,
     String? token,
   }) async {
+    await invalidatePlaylists();
     try {
       final uri = Uri.parse(
           '$baseUrl${ApiConstants.playlistsEndpoint}/$playlistId/tracks/$trackId');
@@ -670,6 +700,7 @@ class ApiService {
     required String playlistId,
     String? token,
   }) async {
+    await invalidatePlaylists();
     try {
       final uri =
           Uri.parse('$baseUrl${ApiConstants.playlistsEndpoint}/$playlistId');
