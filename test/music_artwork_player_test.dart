@@ -20,6 +20,10 @@ void main() {
    final choices=moreSongs(queue:[song('a')],currentId:'a',recommended:[song('b'),song('a')],trending:[song('b'),song('c')]);
    expect(choices.map((s)=>s.id),['b','c']);
  });
+ test('up next excludes songs already passed in the queue', () {
+   final choices=moreSongs(queue:[song('a'),song('b'),song('c')],currentId:'b',recommended:[song('a'),song('d')],trending:[]);
+   expect(choices.map((s)=>s.id),['c','d']);
+ });
  testWidgets('playlist artwork is a square containing the first four covers', (tester) async {
    final pl=Playlist(id:'playlist',name:'My playlist',tracks:List.generate(5,(i)=>song('$i')));
    await tester.pumpWidget(MaterialApp(home:Center(child:PlaylistArtwork(playlist:pl,size:160))));

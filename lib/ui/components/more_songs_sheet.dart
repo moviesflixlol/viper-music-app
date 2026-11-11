@@ -4,8 +4,11 @@ import 'music_artwork.dart';
 
 List<Song> moreSongs({required List<Song> queue, required String? currentId,
   required List<Song> recommended, required List<Song> trending}) {
-  final seen = <String>{if (currentId != null) currentId};
-  return [...queue, ...recommended, ...trending]
+  final index = queue.indexWhere((song) => song.id == currentId);
+  final played = index < 0 ? <Song>[] : queue.take(index + 1);
+  final upcoming = index < 0 ? queue : queue.skip(index + 1);
+  final seen = <String>{if (currentId != null) currentId, ...played.map((s) => s.id)};
+  return [...upcoming, ...recommended, ...trending]
       .where((song) => song.id.isNotEmpty && seen.add(song.id)).toList();
 }
 

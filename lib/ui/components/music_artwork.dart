@@ -52,6 +52,10 @@ class MusicArtwork extends StatelessWidget {
       }
       return Image.network(urls[index], width: width, height: height, fit: fit,
         alignment: alignment, filterQuality: FilterQuality.high, gaplessPlayback: true,
+        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+        loadingBuilder: (context, child, progress) => progress == null ? child :
+          SizedBox(width: width, height: height, child: const ColoredBox(color: Color(0xFF191919),
+            child: Center(child: Icon(Icons.music_note, color: Colors.white24)))),
         errorBuilder: (_, __, ___) => candidate(index + 1));
     }
     return candidate(0);

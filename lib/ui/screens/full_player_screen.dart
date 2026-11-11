@@ -92,7 +92,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                           final artSize = math.max(
                               120.0,
                               math.min(bounds.maxWidth - 40,
-                                  bounds.maxHeight - (compact ? 300 : 390)));
+                                  bounds.maxHeight - (compact ? 390 : 410)));
                           return SingleChildScrollView(
                               physics: const ClampingScrollPhysics(),
                               child: ConstrainedBox(
