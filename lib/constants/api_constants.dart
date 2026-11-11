@@ -2,7 +2,7 @@ class ApiConstants {
   ApiConstants._();
 
   /// Default live NextViper music backend deployed on AWS EC2
-  static const String defaultBaseUrl = 'https://34-232-210-74.sslip.io';
+  static const String defaultBaseUrl = 'https://music.movieflix.lol';
   static const String directHttpUrl = 'http://34.232.210.74:8080';
   static const String emulatorUrl = 'http://10.0.2.2:8080';
 

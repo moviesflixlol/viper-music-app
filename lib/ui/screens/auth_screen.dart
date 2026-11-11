@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../constants/colors.dart';
 import '../../services/auth_service.dart';
 
@@ -8,8 +9,6 @@ enum AuthScreenMode {
   signUpForm,
   signUpInterests,
   signUpVerifyOtp,
-  forgotPasswordEmail,
-  forgotPasswordResetOtp,
 }
 
 class AuthScreen extends StatefulWidget {
@@ -29,10 +28,8 @@ class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _otpController = TextEditingController();
-  final _newPasswordController = TextEditingController();
 
   bool _obscurePassword = true;
-  bool _obscureNewPassword = true;
   String? _errorMessage;
   String? _successMessage;
 
@@ -67,7 +64,6 @@ class _AuthScreenState extends State<AuthScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _otpController.dispose();
-    _newPasswordController.dispose();
     super.dispose();
   }
 
@@ -181,74 +177,14 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  Future<void> _handleSendForgotPasswordOtp() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty || !email.contains('@')) {
-      setState(() => _errorMessage = 'Please enter a valid email address');
-      return;
-    }
-
-    setState(() {
-      _errorMessage = null;
-      _successMessage = null;
-    });
-
-    final res = await widget.authService.forgotPassword(email: email);
-
-    if (!mounted) return;
-    if (res['success'] == true) {
-      setState(() {
-        _mode = AuthScreenMode.forgotPasswordResetOtp;
-        _successMessage = 'A 6-digit password reset code was sent to $email';
-      });
-      _startResendTimer();
-    } else {
-      final err = res['error'] as String? ?? '';
-      if (err.toLowerCase().contains('quota') ||
-          err.toLowerCase().contains('daily limit') ||
-          err.contains('429')) {
-        setState(() => _errorMessage = 'Email service daily limit reached. Please try again later or contact support.');
-      } else {
-        setState(() => _errorMessage = err.isNotEmpty ? err : 'Failed to send reset code');
-      }
-    }
-  }
-
-  Future<void> _handleResetPassword() async {
-    final code = _otpController.text.trim();
-    final newPassword = _newPasswordController.text.trim();
-
-    if (code.length != 6) {
-      setState(() => _errorMessage = 'Please enter the 6-digit reset code');
-      return;
-    }
-    if (newPassword.length < 6) {
-      setState(() => _errorMessage = 'New password must be at least 6 characters');
-      return;
-    }
-
-    setState(() {
-      _errorMessage = null;
-      _successMessage = null;
-    });
-
-    final res = await widget.authService.resetPassword(
-      email: _emailController.text.trim(),
-      code: code,
-      newPassword: newPassword,
+  Future<void> _openPasswordReset() async {
+    final opened = await launchUrl(
+      Uri.parse('https://movieflix.lol/reset-password'),
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: '_self',
     );
-
-    if (!mounted) return;
-    if (res['success'] == true) {
-      setState(() {
-        _mode = AuthScreenMode.signIn;
-        _passwordController.text = newPassword;
-        _otpController.clear();
-        _newPasswordController.clear();
-        _successMessage = 'Password reset successfully! You can now sign in.';
-      });
-    } else {
-      setState(() => _errorMessage = res['error'] as String? ?? 'Reset failed');
+    if (!opened && mounted) {
+      setState(() => _errorMessage = 'Could not open MovieFlix password reset.');
     }
   }
 
@@ -281,9 +217,6 @@ class _AuthScreenState extends State<AuthScreen> {
               setState(() => _mode = AuthScreenMode.signUpForm);
             } else if (_mode == AuthScreenMode.signUpVerifyOtp) {
               setState(() => _mode = AuthScreenMode.signUpInterests);
-            } else if (_mode == AuthScreenMode.forgotPasswordEmail ||
-                _mode == AuthScreenMode.forgotPasswordResetOtp) {
-              setState(() => _mode = AuthScreenMode.signIn);
             } else {
               Navigator.of(context).pop(false);
             }
@@ -372,8 +305,6 @@ class _AuthScreenState extends State<AuthScreen> {
                   if (_mode == AuthScreenMode.signUpForm) _buildSignUpFormView(isLoading),
                   if (_mode == AuthScreenMode.signUpInterests) _buildInterestsPickerView(isLoading),
                   if (_mode == AuthScreenMode.signUpVerifyOtp) _buildVerifyOtpView(isLoading),
-                  if (_mode == AuthScreenMode.forgotPasswordEmail) _buildForgotPasswordEmailView(isLoading),
-                  if (_mode == AuthScreenMode.forgotPasswordResetOtp) _buildForgotPasswordResetOtpView(isLoading),
                 ],
               ),
             ),
@@ -420,11 +351,7 @@ class _AuthScreenState extends State<AuthScreen> {
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
-            onPressed: () => setState(() {
-              _mode = AuthScreenMode.forgotPasswordEmail;
-              _errorMessage = null;
-              _successMessage = null;
-            }),
+            onPressed: _openPasswordReset,
             child: const Text(
               'Forgot Password?',
               style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
@@ -649,124 +576,6 @@ class _AuthScreenState extends State<AuthScreen> {
             onPressed: _resendCooldown > 0 ? null : () => _handleResend('signup'),
             child: Text(
               _resendCooldown > 0 ? 'Resend code in ${_resendCooldown}s' : 'Didn\'t receive code? Resend',
-              style: TextStyle(color: _resendCooldown > 0 ? Colors.white38 : Colors.white70, fontSize: 13),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 5. Forgot Password Email View
-  Widget _buildForgotPasswordEmailView(bool isLoading) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Icon(Icons.lock_reset_rounded, color: AppColors.primaryRed, size: 54),
-        const SizedBox(height: 14),
-        const Text(
-          'Reset Your Password',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Enter your registered email address to receive a 6-digit password reset code.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
-        ),
-        const SizedBox(height: 24),
-
-        _buildEmailField(),
-        const SizedBox(height: 24),
-
-        _buildPrimaryButton(
-          title: 'Send Reset Code',
-          isLoading: isLoading,
-          onPressed: _handleSendForgotPasswordOtp,
-        ),
-        const SizedBox(height: 12),
-
-        Center(
-          child: TextButton(
-            onPressed: () => setState(() {
-              _mode = AuthScreenMode.signIn;
-              _errorMessage = null;
-              _successMessage = null;
-            }),
-            child: const Text('Back to Sign In', style: TextStyle(color: Colors.white70, fontSize: 13)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 6. Forgot Password Reset & Enter New Password View
-  Widget _buildForgotPasswordResetOtpView(bool isLoading) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Icon(Icons.security_rounded, color: AppColors.primaryRed, size: 54),
-        const SizedBox(height: 14),
-        const Text(
-          'Enter Reset Code',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Enter the 6-digit code sent to ${_emailController.text.trim()} and choose a new password.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
-        ),
-        const SizedBox(height: 20),
-
-        // Code
-        TextFormField(
-          controller: _otpController,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 26,
-            letterSpacing: 8,
-            fontWeight: FontWeight.w800,
-          ),
-          decoration: InputDecoration(
-            counterText: '',
-            filled: true,
-            fillColor: AppColors.surface,
-            hintText: '000000',
-            hintStyle: TextStyle(color: Colors.white24, fontSize: 26, letterSpacing: 8),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primaryRed, width: 1.2)),
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        // New Password
-        _buildPasswordField(
-          controller: _newPasswordController,
-          label: 'New Password (min. 6 characters)',
-          obscureText: _obscureNewPassword,
-          onToggleVisibility: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
-        ),
-        const SizedBox(height: 24),
-
-        _buildPrimaryButton(
-          title: 'Update Password & Sign In',
-          isLoading: isLoading,
-          onPressed: _handleResetPassword,
-        ),
-        const SizedBox(height: 12),
-
-        Center(
-          child: TextButton(
-            onPressed: _resendCooldown > 0 ? null : () => _handleResend('reset'),
-            child: Text(
-              _resendCooldown > 0 ? 'Resend code in ${_resendCooldown}s' : 'Resend Code',
               style: TextStyle(color: _resendCooldown > 0 ? Colors.white38 : Colors.white70, fontSize: 13),
             ),
           ),
