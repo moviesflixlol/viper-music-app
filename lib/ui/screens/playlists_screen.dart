@@ -1,7 +1,7 @@
+import '../components/playlist_artwork.dart';
 import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
 import '../../models/playlist.dart';
-import '../../models/song.dart';
 import '../../state/music_controller.dart';
 import '../components/song_tile.dart';
 
@@ -191,10 +191,6 @@ class PlaylistsScreen extends StatelessWidget {
   }
 
   Widget _buildUserPlaylistTile(BuildContext context, Playlist pl) {
-    final hasTracks = pl.tracks.isNotEmpty;
-    final cover = hasTracks && pl.tracks.first.thumbnailUrl.isNotEmpty
-        ? pl.tracks.first.thumbnailUrl
-        : pl.coverUrl;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -207,24 +203,7 @@ class PlaylistsScreen extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            cover,
-            width: 52,
-            height: 52,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              width: 52,
-              height: 52,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppColors.primaryRed, Color(0xFF6B0206)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: const Icon(Icons.queue_music_rounded, color: Colors.white, size: 28),
-            ),
-          ),
+          child: PlaylistArtwork(playlist: pl, size: 52),
         ),
         title: Text(
           pl.name,
@@ -252,18 +231,7 @@ class PlaylistsScreen extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            pl.coverUrl,
-            width: 52,
-            height: 52,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              width: 52,
-              height: 52,
-              color: AppColors.surfaceHighlight,
-              child: const Icon(Icons.music_note, color: Colors.white30),
-            ),
-          ),
+          child: PlaylistArtwork(playlist: pl, size: 52),
         ),
         title: Text(
           pl.name,
@@ -347,24 +315,7 @@ class PlaylistDetailScreen extends StatelessWidget {
           Center(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: Image.network(
-                livePlaylist.coverUrl,
-                width: 170,
-                height: 170,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 170,
-                  height: 170,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColors.primaryRed, Color(0xFF6B0206)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: const Icon(Icons.queue_music_rounded, color: Colors.white, size: 64),
-                ),
-              ),
+              child: PlaylistArtwork(playlist: livePlaylist, size: 170),
             ),
           ),
           const SizedBox(height: 16),

@@ -1,3 +1,4 @@
+import 'music_artwork.dart';
 import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
 import '../../models/song.dart';
@@ -26,7 +27,7 @@ class HeroHeader extends StatelessWidget {
         children: [
           // Background Backdrop Image
           if (song.thumbnailUrl.isNotEmpty)
-            Image.network(
+            MusicArtwork(
               song.thumbnailUrl,
               fit: BoxFit.cover,
               alignment: Alignment.center,

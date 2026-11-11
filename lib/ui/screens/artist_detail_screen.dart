@@ -1,3 +1,4 @@
+import '../components/music_artwork.dart';
 import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
 import '../../models/song.dart';
@@ -91,7 +92,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
+                  MusicArtwork(
                     widget.artist.imageUrl,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(

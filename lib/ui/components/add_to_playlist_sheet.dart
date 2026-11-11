@@ -1,3 +1,5 @@
+import 'playlist_artwork.dart';
+import 'music_artwork.dart';
 import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
 import '../../models/song.dart';
@@ -119,7 +121,7 @@ class AddToPlaylistSheet extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
+                child: MusicArtwork(
                   song.thumbnailUrl,
                   width: 48,
                   height: 48,
@@ -200,20 +202,7 @@ class AddToPlaylistSheet extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                     leading: ClipRRect(
                       borderRadius: BorderRadius.circular(6),
-                      child: Image.network(
-                        pl.tracks.isNotEmpty && pl.tracks.first.thumbnailUrl.isNotEmpty
-                            ? pl.tracks.first.thumbnailUrl
-                            : pl.coverUrl,
-                        width: 44,
-                        height: 44,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 44,
-                          height: 44,
-                          color: Colors.white12,
-                          child: const Icon(Icons.queue_music, color: Colors.white54),
-                        ),
-                      ),
+                      child: PlaylistArtwork(playlist: pl, size: 44),
                     ),
                     title: Text(pl.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                     subtitle: Text('${pl.tracks.length} tracks', style: const TextStyle(color: Colors.white54, fontSize: 12)),

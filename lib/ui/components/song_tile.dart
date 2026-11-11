@@ -1,3 +1,4 @@
+import 'music_artwork.dart';
 import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
 import '../../models/song.dart';
@@ -51,7 +52,7 @@ class SongTile extends StatelessWidget {
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: song.thumbnailUrl.isNotEmpty
-                        ? Image.network(
+                        ? MusicArtwork(
                             song.thumbnailUrl,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => const Icon(

@@ -1,3 +1,4 @@
+import '../components/music_artwork.dart';
 import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
 import '../../state/music_controller.dart';
@@ -322,7 +323,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             ],
                           ),
                           clipBehavior: Clip.antiAlias,
-                          child: Image.network(
+                          child: MusicArtwork(
                             cat.imageUrl,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => Container(color: Colors.black26),

@@ -1,3 +1,5 @@
+import '../components/playlist_artwork.dart';
+import '../components/music_artwork.dart';
 import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
 import '../../models/playlist.dart';
@@ -238,7 +240,7 @@ class _FeedScreenState extends State<FeedScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
+                  child: MusicArtwork(
                     song.thumbnailUrl,
                     width: 138,
                     height: 138,
@@ -301,18 +303,7 @@ class _FeedScreenState extends State<FeedScreen> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                pl.coverUrl,
-                width: 148,
-                height: 148,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 148,
-                  height: 148,
-                  color: AppColors.surface,
-                  child: const Icon(Icons.queue_music, color: Colors.white24, size: 40),
-                ),
-              ),
+              child: PlaylistArtwork(playlist: pl, size: 148),
             ),
             const SizedBox(height: 7),
             Text(pl.name,

@@ -67,7 +67,7 @@ class DownloadsScreen extends StatelessWidget {
                         ),
                         onPressed: () {
                           final shuffled = List.of(downloaded)..shuffle();
-                          controller.playSongWithAuth(context, shuffled.first, queueContext: shuffled);
+                          controller.playSong(shuffled.first, queueContext: shuffled);
                         },
                       ),
                     ),
@@ -102,7 +102,7 @@ class DownloadsScreen extends StatelessWidget {
                             isCurrentTrack: isCurrent,
                             isDownloaded: true,
                             onTap: () {
-                              controller.playSongWithAuth(context, song, queueContext: downloaded);
+                              controller.playSong(song, queueContext: downloaded);
                             },
                             onDownload: () {
                               _confirmDelete(context, song.id, song.title);

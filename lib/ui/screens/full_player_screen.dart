@@ -1,3 +1,6 @@
+import 'dart:async';
+import '../components/more_songs_sheet.dart';
+import '../components/music_artwork.dart';
 import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
 import '../../models/song.dart';
@@ -16,7 +19,7 @@ class FullPlayerScreen extends StatefulWidget {
 class _FullPlayerScreenState extends State<FullPlayerScreen>
     with SingleTickerProviderStateMixin {
   // 0.0 = hero art fully visible, 1.0 = scrolled to queue
-  late final DraggableScrollableController _draggableCtrl;
+  bool _sheetOpen = false;
   late final PageController _artPageCtrl;
 
   MusicController get c => widget.controller;
@@ -24,19 +27,25 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
   @override
   void initState() {
     super.initState();
-    _draggableCtrl = DraggableScrollableController();
-    _artPageCtrl = PageController();
+    _artPageCtrl = PageController(initialPage: c.player.currentIndex < 0 ? 0 : c.player.currentIndex);
     c.player.addListener(_onPlayerChange);
   }
 
   void _onPlayerChange() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    final index = c.player.currentIndex;
+    if (_artPageCtrl.hasClients && _artPageCtrl.page?.round() == index) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _artPageCtrl.hasClients && index >= 0 && index < c.player.queue.length) {
+        _artPageCtrl.jumpToPage(index);
+      }
+    });
   }
 
   @override
   void dispose() {
     c.player.removeListener(_onPlayerChange);
-    _draggableCtrl.dispose();
     _artPageCtrl.dispose();
     super.dispose();
   }
@@ -112,13 +121,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
 
                 // ── Hero art — swipeable between queue songs ──
                 Expanded(
-                  child: GestureDetector(
-                    // Swipe down closes player
-                    onVerticalDragEnd: (d) {
-                      if (d.primaryVelocity != null && d.primaryVelocity! > 400) {
-                        Navigator.of(context).pop();
-                      }
-                    },
+                  child: SwipeUpSongs(
+                    onOpen: () => _showQueueSheet(context, queue, curIdx),
+                    onSwipeDown: () => Navigator.of(context).pop(),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: queue.isNotEmpty
@@ -247,13 +252,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
                 ),
 
                 // ── Up Next hint — tap to expand queue ──
-                GestureDetector(
-                  onTap: () => _showQueueSheet(context, queue, curIdx),
-                  onVerticalDragEnd: (d) {
-                    if (d.primaryVelocity != null && d.primaryVelocity! < -200) {
-                      _showQueueSheet(context, queue, curIdx);
-                    }
-                  },
+                SwipeUpSongs(
+                  tapToOpen: true,
+                  onOpen: () => _showQueueSheet(context, queue, curIdx),
                   child: Container(
                     width: double.infinity,
                     margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
@@ -266,7 +267,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('UP NEXT',
+                        const Text('MORE SONGS',
                             style: TextStyle(
                                 color: Colors.white54,
                                 fontSize: 11,
@@ -277,7 +278,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
                             if (queue.length > curIdx + 1) ...[
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(4),
-                                child: Image.network(
+                                child: MusicArtwork(
                                   queue[curIdx + 1].thumbnailUrl,
                                   width: 32,
                                   height: 32,
@@ -316,92 +317,31 @@ class _FullPlayerScreenState extends State<FullPlayerScreen>
     );
   }
 
-  void _showQueueSheet(BuildContext context, List<Song> queue, int curIdx) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF181818),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.92,
-        expand: false,
-        builder: (_, scrollCtrl) => Column(
-          children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Text('Up Next',
-                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: ListView.builder(
-                controller: scrollCtrl,
-                itemCount: queue.length,
-                itemBuilder: (context, i) {
-                  final item = queue[i];
-                  final isCur = i == curIdx;
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
-                    leading: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: item.thumbnailUrl.isNotEmpty
-                              ? Image.network(item.thumbnailUrl, width: 46, height: 46, fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      Container(width: 46, height: 46, color: AppColors.surface))
-                              : Container(width: 46, height: 46, color: AppColors.surface),
-                        ),
-                        if (isCur)
-                          const Icon(Icons.equalizer_rounded, color: AppColors.primaryRed, size: 20),
-                      ],
-                    ),
-                    title: Text(
-                      item.title,
-                      maxLines: 1,
-                      style: TextStyle(
-                        color: isCur ? AppColors.primaryRed : Colors.white,
-                        fontWeight: isCur ? FontWeight.w700 : FontWeight.w500,
-                        fontSize: 14,
-                      ),
-                    ),
-                    subtitle: Text(item.artist,
-                        style: const TextStyle(color: Colors.white38, fontSize: 12)),
-                    trailing: isCur
-                        ? const Icon(Icons.volume_up_rounded, color: AppColors.primaryRed, size: 18)
-                        : null,
-                    onTap: () {
-                      c.player.playSong(item, queueContext: queue);
-                      Navigator.pop(context);
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  Future<void> _showQueueSheet(BuildContext context, List<Song> queue, int curIdx) async {
+    if (_sheetOpen) return;
+    _sheetOpen = true;
+    if (c.feedRecommendations.isEmpty && c.trendingTracks.isEmpty) {
+      unawaited(c.loadInitialFeed());
+    }
+    try {
+      await showModalBottomSheet<void>(
+        context: context, backgroundColor: Colors.transparent,
+        isScrollControlled: true, useSafeArea: true,
+        builder: (sheetContext) => AnimatedBuilder(animation: c, builder: (_, __) {
+          final choices = moreSongs(queue: queue,
+            currentId: c.player.currentSong?.id,
+            recommended: c.feedRecommendations, trending: c.trendingTracks);
+          return MoreSongsSheet(songs: choices, onSelected: (song) {
+            c.playSong(song, queueContext: choices);
+            Navigator.of(sheetContext).pop();
+          });
+        }),
+      );
+    } finally {
+      _sheetOpen = false;
+    }
   }
+
 }
 
 // ── Sub-widgets ──────────────────────────────────────────────────
@@ -443,7 +383,7 @@ class _ArtCard extends StatelessWidget {
             ),
             clipBehavior: Clip.antiAlias,
             child: thumbnailUrl.isNotEmpty
-                ? Image.network(thumbnailUrl, fit: BoxFit.cover,
+                ? MusicArtwork(thumbnailUrl, fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => _fallback())
                 : _fallback(),
           ),
@@ -468,7 +408,7 @@ class _BlurredBg extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         if (thumbnailUrl.isNotEmpty)
-          Image.network(thumbnailUrl, fit: BoxFit.cover,
+          MusicArtwork(thumbnailUrl, fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => const SizedBox()),
         Container(color: Colors.black.withOpacity(0.82)),
       ],
